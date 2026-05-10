@@ -17,7 +17,8 @@ module "vpc" {
   name = "${var.cluster_name}-vpc"
   cidr = var.vpc_cidr
 
-  # 只取前兩個 AZ，以在「節省成本」與「多可用區高可用性」之間取得平衡
+  # 關鍵設定：跨可用區 (Multi-AZ) 配置
+  # 這裡取前兩個 AZ，確保叢集具備高可用性 (High Availability)，當單一機房故障時仍能運作。
   azs = slice(data.aws_availability_zones.available.names, 0, 2)
 
   # 私有子網：放置 EKS Worker Nodes 與資料庫，不直接對外開放
@@ -47,4 +48,3 @@ module "vpc" {
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
-

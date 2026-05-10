@@ -67,6 +67,15 @@
 
 ---
 
+### 4. 可觀測性與監控 (Observability)
+
+| 能力 | 說明 | 實踐位置 |
+| :--- | :--- | :--- |
+| **全方位監控 (Prometheus)** | 透過 Prometheus 自動收集 K8s 叢集與應用的效能指標 (Metrics)。 | `kube-prometheus-stack` (Helm Chart) |
+| **視覺化儀表板 (Grafana)** | 提供預設的 K8s 監控面板，方便快速查看 CPU/Memory 使用率與系統瓶頸。 | [k8s/09-observability.yaml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/09-observability.yaml) |
+
+---
+
 ## 🛠️ 架構演進與技術選型 (Evolution & Choices)
 
 在建置此專案時，我面臨了多種技術選擇，以下為最終選型的商業與技術考量：

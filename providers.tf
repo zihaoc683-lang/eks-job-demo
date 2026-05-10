@@ -2,7 +2,7 @@
  * # Providers Configuration
  * 
  * 本檔案定義了 Terraform 的基礎設定以及所需的供應商 (Providers)。
- * 我們使用了 AWS、Kubernetes、Helm 與 Time 等 Provider 來管理不同層次的資源。
+ * 我們使用了 AWS、Kubernetes 與 Time 等 Provider 來管理不同層次的資源。
  */
 
 terraform {
@@ -20,11 +20,7 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
     }
-    # Helm Provider: 用於透過 Helm Chart 部署應用程式 (如 Metrics Server, Argo Rollouts)
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.11"
-    }
+
     # Time Provider: 用於處理資源刪除時的延遲等待 (Cleanup 邏輯使用)
     time = {
       source  = "hashicorp/time"
