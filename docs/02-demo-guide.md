@@ -369,7 +369,7 @@ HIGH: ...
 
 1.  **展示 Ansible 腳本與驗證**：
     *   **操作**：打開 VSCode 秀出 `ansible/node-hardening.yml`。
-    *   **指令 (本地跑語法檢查模擬)**：在終端機執行 `ansible-playbook ansible/node-hardening.yml --syntax-check` (需安裝 Ansible，若無安裝則純解釋檔案即可)。
+    *   **解說點**：向考官解釋：「雖然在 Windows 開發機上沒有安裝 Ansible 執行環境，但您可以從這個 Playbook 中看到，我定義了 `amazon-ssm-agent` 的狀態必須是 `started` 且 `enabled`。在真實的 CI/CD 流程中，我們會用它來做節點的自動化安檢與設定。」
 2.  **解說 IaC 工具的職責邊界**：
     *   📢 架構介紹：雖然 K8s 提供容器隔離，但底層 EC2 節點的 OS 安全同樣重要。我使用 Ansible 進行 Node Hardening，例如關閉不必要的服務、優化 TCP 參數。
 3.  📢 架構介紹（工具職責分工）：「各個 IaC 工具職責明確：Terraform 負責『把房子蓋起來』，Ansible 負責『把房子的鎖裝好 (OS 合規)』，K8s 讓『應用程式住進去』。這三者結合才是生產標準的雲原生基礎設施。」
