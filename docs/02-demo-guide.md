@@ -427,7 +427,15 @@ HIGH: ...
     
     # 2. 刪除所有的 PVC 以釋放 AWS EBS 實體硬碟 (防止持續扣款)
     kubectl delete pvc --all --ignore-not-found
+    
+    # 【故障排除】如果 PVC 卡在 Terminating 刪不掉？
+    # 通常是因為還有 Pod 正在掛載該硬碟。請執行：kubectl delete rollout --all
     ```
+
+    > [!NOTE]
+    > **🔍 技術原理解析：為什麼節點硬碟設定為 20 GiB？**
+    > 「在 `eks.tf` 中，我為每個節點配置了 20 GiB 的 `gp3` 硬碟。這並非浪費，而是 EKS 的**最佳實踐最小規格**。Kubernetes 核心組件與我們安裝的治理工具 (Argo CD, Kyverno, Trivy) 的鏡像檔會佔用約 5-8 GiB。設定 20 GiB 能確保在長時間運作下，不會因為磁碟爆滿 (`DiskPressure`) 導致節點失效。在成本端，這僅增加極微小的支出，卻能換取 Demo 過程的絕對穩定。」
+
 2.  **等待 1~2 分鐘**，確保 AWS 後台的 LoadBalancer 已經完全消失。
 3.  **執行基礎設施銷毀**：
     ```powershell
