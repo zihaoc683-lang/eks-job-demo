@@ -27,7 +27,7 @@ resource "null_resource" "k8s_cleanup" {
 resource "time_sleep" "wait_for_eni_cleanup" {
   # 建立時不需要等待
   create_duration = "1s"
-  
+
   # 僅在執行 terraform destroy 時觸發等待 60 秒
   # 這段時間是給 AWS 背景程序回收網路介面 (ENI) 與負載平衡器 (ELB) 的緩衝期
   destroy_duration = "60s"

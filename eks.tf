@@ -9,7 +9,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
-  cluster_name    = var.cluster_name
+  cluster_name = var.cluster_name
   # EKS K8S 叢集版本：鎖定 1.31 這是目前 AWS 比較通用的現代版本
   cluster_version = "1.31"
 
@@ -31,9 +31,9 @@ module "eks" {
 
   # 控制 K8S 原生套件 (Add-ons)
   cluster_addons = {
-    coredns = {}
+    coredns    = {}
     kube-proxy = {}
-    vpc-cni = {}
+    vpc-cni    = {}
     # AWS EBS CSI 驅動程式：讓 K8S 能動態建立與掛載 AWS EBS 磁碟 (支援 StatefulSet 測試)
     aws-ebs-csi-driver = {
       service_account_role_arn = module.ebs_csi_irsa_role.iam_role_arn
@@ -55,14 +55,14 @@ module "eks" {
 
       # 使用 t3.small (2 vCPU, 2GB RAM)：足夠運行我們的電商 Demo 應用
       instance_types = ["t3.small", "t3.medium"] # 增加備選機型提高 Spot 獲得率
-      
+
       # 自定義根磁碟大小與類型 (gp3 提供更穩定的硬體效能比)
       block_device_mappings = {
         xvda = {
           device_name = "/dev/xvda"
           ebs = {
-            volume_size = 20
-            volume_type = "gp3"
+            volume_size           = 20
+            volume_type           = "gp3"
             delete_on_termination = true
           }
         }
@@ -72,12 +72,12 @@ module "eks" {
 
   node_security_group_additional_rules = {
     ingress_allow_access_from_anywhere = {
-      description      = "Allow access from anywhere"
-      protocol         = "tcp"
-      from_port        = 30000
-      to_port          = 32767
-      type             = "ingress"
-      cidr_blocks      = ["0.0.0.0/0"]
+      description = "Allow access from anywhere"
+      protocol    = "tcp"
+      from_port   = 30000
+      to_port     = 32767
+      type        = "ingress"
+      cidr_blocks = ["0.0.0.0/0"]
     }
   }
 

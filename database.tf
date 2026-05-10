@@ -21,24 +21,24 @@ resource "aws_security_group" "db_sg" {
 
 # 2. RDS MySQL 實例
 resource "aws_db_instance" "mysql" {
-  identifier           = "ecommerce-prod-db"
-  allocated_storage    = 20
-  storage_type         = "gp3"
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t3.micro" # 測試環境使用微型，面試時說明生產環境可用 db.m5.xlarge
-  db_name              = "ecommerce"
-  username             = "admin"
-  password             = "Password123" # 展示用，應結合 Secret Manager
-  parameter_group_name = "default.mysql8.0"
-  skip_final_snapshot  = true
-  publicly_accessible  = false
+  identifier             = "ecommerce-prod-db"
+  allocated_storage      = 20
+  storage_type           = "gp3"
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = "db.t3.micro" # 測試環境使用微型，面試時說明生產環境可用 db.m5.xlarge
+  db_name                = "ecommerce"
+  username               = "admin"
+  password               = "Password123" # 展示用，應結合 Secret Manager
+  parameter_group_name   = "default.mysql8.0"
+  skip_final_snapshot    = true
+  publicly_accessible    = false
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   db_subnet_group_name   = module.vpc.database_subnet_group_name
 
   # 面試加分點：自動備份與多可用區 (Multi-AZ)
   backup_retention_period = 7
-  multi_az               = false # 節省 Demo 成本，面試說明生產會開 Multi-AZ
+  multi_az                = false # 節省 Demo 成本，面試說明生產會開 Multi-AZ
 
   depends_on = [module.vpc, aws_security_group.db_sg]
 }
