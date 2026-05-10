@@ -30,12 +30,7 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = true
 
-  # 建立資料庫與快取專用子網群組，解決 VPC Mismatch 問題
-  create_database_subnet_group = true
-  database_subnets             = ["10.0.151.0/24", "10.0.152.0/24"]
 
-  create_elasticache_subnet_group = true
-  elasticache_subnets             = ["10.0.161.0/24", "10.0.162.0/24"]
 
   # 啟用 DNS 解析，這是 EKS 節點加入叢集與服務發現的基礎
   enable_dns_hostnames = true

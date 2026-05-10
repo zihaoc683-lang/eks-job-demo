@@ -7,7 +7,7 @@
 ## 🛠️ 準備階段 (不可跳過)
 
 ### 0.1 基礎設施 (IaC)
-*   **📂 涉及檔案**：`terraform/*.tf` (主結構定義)
+   **📂 涉及檔案**：`terraform/.tf` (主結構定義)
 *   **指令**：`terraform apply -auto-approve`
 *   **意義**：建立 VPC, EKS, RDS, Redis。
 
@@ -59,7 +59,7 @@
         ```
     *   **🔍 技術原理與 AWS 聯動 (技術原理)**：
         1.  **K8s 監控層**：`Metrics Server` 採集數據，`HPA` 根據公式 `ceil[目前副本數 * (目前數據 / 目標數據)]` 決定擴容。
-        2.  **AWS 觀察點 1 - EC2 控制台 (保證成功)**：進入 AWS Console -> **EC2** -> **執行中實例**。選中你的 EKS Node，點擊下方的 *「監控 (Monitoring)」* 標籤。你可以看到 **CPU 使用率 (CPU Utilization)** 的折線圖正在同步飆升。
+        2.  **AWS 觀察點 1 - EC2 控制台 (保證成功)**：進入 AWS Console -> **EC2** -> **執行中實例**。選中你的 EKS Node，點擊下方的 「監控 (Monitoring)」 標籤。你可以看到 **CPU 使用率 (CPU Utilization)** 的折線圖正在同步飆升。
         3.  **AWS 觀察點 2 - EC2 ASG**：當 Pod 數量多到節點放不下時，`Cluster Autoscaler` 會觸發 AWS **Auto Scaling Group**。進入 **EC2 -> Auto Scaling Groups**，你會看到「期望容量 (Desired Capacity)」自動增加，並啟動新的 EC2 實例。
         4.  **🔍 進階技術說明（HPA 震盪控制）**：「您可能會注意到我的 HPA 設定檔中使用了 v2 版本的 `behavior` 區塊。在真實生產環境中，流量經常是突發且不穩定的。如果沒有設定 `stabilizationWindowSeconds` (冷卻時間)，Pod 會隨著流量波動頻繁地建立與刪除，這稱為『震盪 (Thrashing)』。我透過精細設定這個參數，確保了擴容迅速、縮容平穩，保護了底層節點的穩定性。」
         5.  **架構價值總結**：「這套架構實現了從應用程式壓力到雲端硬體資源的完全自動化連動，大幅降低了維運成本並提升了業務穩定性。」
@@ -229,7 +229,7 @@
 
 ### 👆 Step 1：打開 GitHub Actions 頁面
 
-**操作**：打開瀏覽器 → 進你的 GitHub 專案 → 點上方 *「Actions」* 頁籤
+**操作**：打開瀏覽器 → 進你的 GitHub 專案 → 點上方 「Actions」 頁籤
 
 **你會看到**：所有自動跑過的流水線列表
 
@@ -240,11 +240,11 @@
 
 ### 👆 Step 2：點進 Security Scan 那一筆
 
-**操作**：點擊列表中的 *「Security Scan」* 那一行（有 ✅ 的那筆）
+**操作**：點擊列表中的 「Security Scan」 那一行（有 ✅ 的那筆）
 
 **你會看到**：左邊有 `Container Security Scan` 這個 Job
 
-**操作**：點進去，點開 *「Run Trivy vulnerability scanner in IaC mode」* 那個步驟
+**操作**：點進去，點開 「Run Trivy vulnerability scanner in IaC mode」 那個步驟
 
 **你會看到**：一大堆掃描輸出，像這樣：
 ```
@@ -261,11 +261,11 @@ HIGH: ...
 
 ### 👆 Step 3：點進 Terraform CI/CD 那一筆
 
-**操作**：返回 Actions 列表 → 點擊 *「Terraform CI/CD (Multi-Tool Demo)」* 那一行
+**操作**：返回 Actions 列表 → 點擊 「Terraform CI/CD (Multi-Tool Demo)」 那一行
 
 **你會看到**：幾個步驟，包括 `Terraform Format Check`、`Run Checkov`、`Terraform Init`
 
-**操作**：展開 *「Run Checkov (Security Scan)」* 步驟
+**操作**：展開 「Run Checkov (Security Scan)」 步驟
 
 **說明**：
 > 「這條流水線用來確保我的基礎設施代碼品質。它會做三件事：第一，格式檢查，確保代碼風格一致；第二，用 Checkov 做靜態安全分析，抓出 Terraform 設定中的資安漏洞；第三，跑 Terraform Plan，預覽這次變更會對雲端資源造成什麼影響，讓工程師在合併前就能確認。」
@@ -280,8 +280,13 @@ HIGH: ...
 ---
 
 ## 🎭 場景七：GitOps 持續交付 (Argo CD) - 🌟 破壞性修復展示
-**📂 涉及檔案**：`k8s/08-argo-application.yaml`
-**展示內容**：展示 GitOps 最高境界：「配置偏移自動修復 (Drift Detection)」。
+**📂 涉及檔案**：`k8s/08-argo-application.yaml` 及 `k8s/base/`, `k8s/overlays/production/`
+**展示內容**：展示 GitOps 最高境界：「配置偏移自動修復 (Drift Detection)」與 Kustomize 架構。
+
+> [!NOTE]
+> **架構設計亮點：Kustomize (Base & Overlays) 架構**
+> 在執行部署前，我們可以看到專案中使用了 `k8s/base/` (公版) 與 `k8s/overlays/production/` (客製化覆蓋版)。
+> 傳統部署中，不同環境 (Dev, Prod) 往往需要複製多份 YAML，導致維護困難。透過 Kustomize，我們將共通設定放在 `base`，並在 `overlays` 針對特定環境打上 Patch (例如提高正式機的副本數)。這樣確保了基礎架構的「唯一真相」，大幅提升設定檔的重用性並降低維護風險。Argo CD 將會直接拉取 `production` 的設定進行部署。
 
 > [!TIP]
 > **前置準備 (大掃除與安裝)**：
@@ -340,13 +345,13 @@ HIGH: ...
 2.  **💪 實戰破壞展示 (Drift Detection)**：
     *   📢 架構介紹：Argo CD 主動監聽 GitHub。一旦發現 YAML 變更，就會自動拉取並套用。Git 是唯一的真相來源。現在我來模擬有人惡意或誤操作，刪除線上資源。
     *   **破壞指令** (開另一個終端機執行)：`kubectl delete svc ecommerce-svc`
-    *   **觀察與高潮**：切換回 Argo CD 介面，您會看到狀態瞬間變成黃色的 `Out of Sync`，接著 Argo CD 會在幾秒內*「自動把 Service 重建回來」*，並恢復綠色打勾。
+    *   **觀察與高潮**：切換回 Argo CD 介面，您會看到狀態瞬間變成黃色的 `Out of Sync`，接著 Argo CD 會在幾秒內「自動把 Service 重建回來」，並恢復綠色打勾。
 3.  **🔍 技術原理解析（為何會秒恢復？）**：
-    *   📢 **面試解說重點一：GitOps 單一真相來源 (Single Source of Truth)**
+    *   📢 **架構設計亮點一：GitOps 單一真相來源 (Single Source of Truth)**
         「傳統維運中，K8s 的實際狀態與我們手邊的 YAML 檔很容易脫節。而 GitOps 的核心精神是：『Git 倉庫裡的程式碼，就是環境的唯一真相』。當我們把專案綁定到 Argo CD 後，它就成為了這個真相的守護者。」
-    *   📢 **面試解說重點二：調和迴圈 (Reconciliation Loop)**
+    *   📢 **架構設計亮點二：調和迴圈 (Reconciliation Loop)**
         「Argo CD 內部有一個 Controller，它會每 3 分鐘（預設值，也可以設定 webhook 即時觸發）去比對『Git 上的 YAML』與『K8s 實際運行的資源』。這就像是會計在對帳一樣。」
-    *   📢 **面試解說重點三：自我修復機制 (Self-Healing)**
+    *   📢 **架構設計亮點三：自我修復機制 (Self-Healing)**
         「在剛才的展示中，我手動刪除了 Service。Argo CD 在對帳時立刻發現：『咦？Git 上明明寫著要有這個 Service，為什麼 K8s 裡面沒有？這產生了**配置偏移 (Configuration Drift)**！』。因為我們在 Application 設定中開啟了 `selfHeal: true`，Argo CD 就會毫不猶豫地把遺失的資源重新 apply 回去。這徹底杜絕了工程師圖方便『手動改線上機器卻不改 Code』的壞習慣，確保基礎設施始終與 Git 保持一致。」
 
 4.  **🧹 場景收尾：停止 Port Forward**：
@@ -369,24 +374,24 @@ HIGH: ...
 
 1.  **展示 Ansible 腳本與驗證**：
     *   **操作**：打開 VSCode 秀出 `ansible/node-hardening.yml`。
-    *   **解說點 (展現您的跨平台與除錯能力)**：「因為這台展示用的筆電是 Windows，預設無法直接執行 Linux 專用的 Ansible。但在現代 Kubernetes 架構下，我們可以把任何工具『容器化』。我寫了一個腳本，它會自動在 K8s 裡開一個裝好 Ansible 的臨時容器，幫我們檢查這份檔案。」
+    *   **解說點 (跨平台與除錯自動化)**：「因為這台展示用的筆電是 Windows，預設無法直接執行 Linux 專用的 Ansible。但在現代 Kubernetes 架構下，我們可以把任何工具『容器化』。我寫了一個腳本，它會自動在 K8s 裡開一個裝好 Ansible 的臨時容器，幫我們檢查這份檔案。」
     *   **指令 (觸發容器化語法檢查)**：
         ```powershell
         .\bin\run-ansible.ps1 ansible/node-hardening.yml
         ```
-    *   **🔍 結果解析 (這是給您看的防呆教學，也可以順著講給考官聽)**：
+    *   **🔍 結果解析 (這是給您看的防呆教學，也可以順著講給團隊聽)**：
         *   **這是在檢查什麼？** 這是「**語法檢查 (Syntax Check)**」。就像交卷前用軟體檢查有沒有拼字錯誤。它會檢查你的 YAML 縮排對不對、模組名稱有沒有拼錯，但**不會**真的去動到你的伺服器。
-        *   **這份腳本實際上是做什麼用的？ (面試重點)** 如果我們真的把這份腳本套用到伺服器上，它會做這 5 件維運工程師最關心的事：
+        *   **這份腳本實際上是做什麼用的？ (技術展示重點)** 如果我們真的把這份腳本套用到伺服器上，它會做這 5 件維運工程師最關心的事：
             1. **安裝系統更新**：自動把 Linux 的漏洞補丁打上。
             2. **安裝排障工具包**：預先裝好 `htop`、`tcpdump` 等網路查修工具，半夜機器出事時才不用花時間現裝。
             3. **統一系統時區**：強制設為 `Asia/Taipei`，確保未來查 Log 時時間對得上。
             4. **優化網路參數**：把作業系統的網路連線上限 (`somaxconn`) 調高，讓 K8s 節點能承受更大流量。
             5. **確保 SSM Agent 執行中**：確保我們能安全地遠端連線進機器排障。
-        *   **畫面上的 `[WARNING]` 是報錯嗎？** 不是報錯，是**好消息**！這些警告只是在說：「*你沒告訴我要連去哪台機器 (No inventory)*」。這非常合理，因為我們只是在做「語法檢查」，本來就沒有要它真的連線去改機器。
+           **畫面上的 `[WARNING]` 是報錯嗎？** 不是報錯，是**好消息**！這些警告只是在說：「你沒告訴我要連去哪台機器 (No inventory)*」。這非常合理，因為我們只是在做「語法檢查」，本來就沒有要它真的連線去改機器。
         *   **哪裡看出來成功了？** 只要最後一行印出 `playbook: /playbook/node-hardening.yml`，且沒有出現紅色的 `ERROR` 字眼，就代表這份腳本語法 100% 正確，可以隨時投入生產環境使用。
 
-2.  **解說 IaC 工具的職責邊界 (展示您的架構視野)**：
-    *   📢 **向考官總結 (大樓與房間的比喻)**：「很多工程師只會管 Kubernetes 裡面的 Pod，卻忘記了底層的 Linux 伺服器如果不安全，駭客一樣能攻破。我們可以把雲端架構想像成一棟大樓：
+2.  **解說 IaC 工具的職責邊界 (高階架構視野)**：
+    *   📢 **向團隊總結 (大樓與房間的比喻)**：「很多工程師只會管 Kubernetes 裡面的 Pod，卻忘記了底層的 Linux 伺服器如果不安全，駭客一樣能攻破。我們可以把雲端架構想像成一棟大樓：
         1. **Terraform** 負責買地、蓋大樓本體 (AWS VPC、網路、實體節點)。
         2. **Ansible** (也就是我們剛剛檢查的腳本) 負責這棟大樓的**大門保全、水電與監視器**，它專門針對 **EKS 底層的工作節點 (EC2 實例的 Linux OS)** 進行安全補丁與系統優化。
         3. **Kubernetes** 負責管理大樓裡的房間，讓應用程式 (Pods) 安全地住進來。
@@ -396,7 +401,7 @@ HIGH: ...
 
 ## 🧹 結束清理 (重要：防止 AWS 卡死與額外扣款)
 > [!WARNING]
-> *絕對不能直接跑 `terraform destroy`！*
+> 絕對不能直接跑 `terraform destroy`！
 > 必須先用 `kubectl` 刪除 LoadBalancer、Ingress 與雲端硬碟，否則 AWS VPC 會因為有殘留的網卡 (ENI) 與安全群組 (Security Group) 而無法刪除（卡死報錯），且殘留的 EBS 硬碟會持續扣款！
 
 1.  **清掃 K8s 產生的雲端資源 (NLB, ALB 與 EBS)**：
