@@ -428,3 +428,8 @@ HIGH: ...
     > 「我刻意手動清除了 Service (NLB) 與 PVC (EBS)，是因為它們跨越了 K8s，向底層 AWS 索取了『叢集外』的實體資源。」
     > 「以 PVC 為例，如果直接執行 `terraform destroy`，Terraform 會粗暴地把 EKS 節點砍掉。這導致負責去 AWS 砍掉磁碟區的 **AWS EBS CSI Driver** 也跟著陣亡了，來不及執行清理。結果就是 Kubernetes 裡的資源雖然消失，但 AWS 後台的 EBS 磁碟區卻變成了『孤兒 (Orphaned Resources)』，持續計費且難以追蹤。」
     > 「因此，標準流程必須是在叢集還活著的時候，先讓 Kubernetes 控制器 (CSI Driver / AWS Load Balancer Controller) 有時間呼叫 AWS API 刪除實體資源。確認乾淨後，再交由 Terraform 執行基礎設施的銷毀。這展現了我對 IaC 邊界與 Kubernetes 動態資源生命週期的深刻理解。」
+
+    > [!NOTE]
+    > **🔍 技術原理解析：為什麼刪除 `.tf` 檔案後，`terraform destroy` 依然能順利執行？**
+    > 「在剛才的實作中，我刪除了不再使用的資料庫設定檔 (`database.tf`)。很多人會擔心這會導致 `terraform destroy` 報錯，但實際上並不會。」
+    > 「Terraform 依賴的是**狀態檔 (State File)** 而不是純粹的原始碼。由於資料庫已經建立並記錄在狀態檔中，`terraform destroy` 會直接讀取該狀態，依照當初建立的順序與清單，準確無誤地將雲端資源 (RDS/Redis) 徹底銷毀。這展現了 Terraform 作為狀態機 (State Machine) 的強大之處，也證明了我對基礎設施即代碼 (IaC) 核心運作機制的掌握程度。」
