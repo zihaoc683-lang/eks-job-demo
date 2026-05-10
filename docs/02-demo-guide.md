@@ -34,6 +34,8 @@
 *   **📂 涉及檔案**：`bootstrap-platform.ps1`
 *   **指令**：`.\bootstrap-platform.ps1`
 *   **意義**：一鍵佈署維運鐵三角：Metrics Server (監控)、Argo (交付)、Kyverno (政策)、Trivy (掃描)。
+    *   📢 **技術亮點**：特別是 **Metrics Server**，它是 **場景一 (HPA)** 的靈魂。沒有它，K8s 將無法獲取資源指標，HPA 也會失效。它是讓叢集具備「感知能力」的第一步。
+
 
 ---
 
