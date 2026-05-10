@@ -408,10 +408,7 @@ HIGH: ...
     # 1. 刪除服務以釋放 AWS NLB (Network Load Balancer)
     kubectl delete -f k8s/03-service.yaml --ignore-not-found
     
-    # 2. 刪除 Ingress 以釋放 AWS ALB (如果有練習到這塊的話)
-    kubectl delete -f k8s/10-ingress.yaml --ignore-not-found
-    
-    # 3. 刪除所有的 PVC 以釋放 AWS EBS 實體硬碟 (防止持續扣款)
+    # 2. 刪除所有的 PVC 以釋放 AWS EBS 實體硬碟 (防止持續扣款)
     kubectl delete pvc --all --ignore-not-found
     ```
 2.  **等待 1~2 分鐘**，確保 AWS 後台的 LoadBalancer 已經完全消失。
