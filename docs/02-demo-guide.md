@@ -7,16 +7,19 @@
 ## 🛠️ 準備階段 (不可跳過)
 
 ### 0.1 基礎設施 (IaC)
+*   **📂 涉及檔案**：`terraform/*.tf` (主結構定義)
 *   **指令**：`terraform apply -auto-approve`
 *   **意義**：建立 VPC, EKS, RDS, Redis。
 
 ### 0.2 平台引導 (Bootstrap)
+*   **📂 涉及檔案**：`bootstrap-platform.ps1`
 *   **指令**：`.\bootstrap-platform.ps1`
 *   **意義**：快速佈署 Metrics Server, Argo, Kyverno, Trivy。
 
 ---
 
 ## 🎭 場景一：自癒與自動擴縮 (Self-Healing & HPA)
+**📂 涉及檔案**：`k8s/02-rollout.yaml`, `k8s/03-service.yaml`, `k8s/04-hpa.yaml`
 **展示內容**：展示 EKS 如何像「活的生物」一樣自我管理。
 
 1.  **部署專業應用**：
@@ -64,6 +67,7 @@
 ---
 
 ## 🎭 場景二：金絲雀發布 (Canary Rollout) - P0 核心
+**📂 涉及檔案**：`k8s/02-rollout.yaml`
 **展示內容**：模擬「錯誤版本上線 -> 秒級回滾 -> 正確版本上線 -> 漸進式放量」。
 
 > [!TIP]
@@ -98,6 +102,7 @@
 ---
 
 ## 🎭 場景三：政策治理 (Governance / Kyverno) - P0 核心
+**📂 涉及檔案**：`k8s/07-kyverno-policy.yaml`, `k8s/03-bad-pod.yaml`
 **展示內容**：防止工程師「誤操作」導致的安全漏洞。
 
 > [!TIP]
@@ -153,6 +158,7 @@
 ---
 
 ## 🎭 場景四：雲端存儲持久化 (EBS Storage)
+**📂 涉及檔案**：`demo-pods/ebs-test-pod-a.yaml`, `demo-pods/ebs-test-pod-b.yaml`
 **展示內容**：證明 K8s Pod 壞掉後，資料「不會不見」。
 
 > [!TIP]
@@ -183,6 +189,7 @@
 ---
 
 ## 🎭 場景五：資安漏洞自動掃描 (Trivy)
+**📂 涉及檔案**：(平台級件，由 Bootstrap 腳本安裝)
 1.  **指令**：`kubectl get vulnerabilityreports -A`
 2.  **預期結果**：你會看到滿滿的系統元件（如 `kube-system` 或 `kyverno`）的掃描報告。這證明了即使你在 `default` 沒有部署應用，平台也已經在自動防護了。
 3.  📢 架構介紹（Runtime Scanning）：「透過部署 Trivy Operator，我們將資安掃描 (Image Scanning) 從 CI pipeline 延伸到了 Kubernetes 運行時 (Runtime)。只要任何 Pod 跑在這個叢集上，Trivy 就會在背景自動掃描它的已知漏洞 (CVE)。」
@@ -198,6 +205,7 @@
 ---
 
 ## 🎭 場景六：DevSecOps CI 管道 (GitHub Actions)
+**📂 涉及檔案**：`.github/workflows/security-scan.yml`, `.github/workflows/terraform-ci.yml`
 **展示內容**：展示「左移資安 (Shift-Left)」，不用敲任何 K8s 指令，純展示瀏覽器畫面。
 
 > [!TIP]
@@ -272,6 +280,7 @@ HIGH: ...
 ---
 
 ## 🎭 場景七：GitOps 持續交付 (Argo CD) - 🌟 破壞性修復展示
+**📂 涉及檔案**：`k8s/08-argo-application.yaml`
 **展示內容**：展示 GitOps 最高境界：「配置偏移自動修復 (Drift Detection)」。
 
 > [!TIP]
@@ -351,6 +360,7 @@ HIGH: ...
 ---
 
 ## 🎭 場景八：底層節點安全強化 (Ansible Node Hardening)
+**📂 涉及檔案**：`ansible/node-hardening.yml`
 **展示內容**：展現您除了 K8s，也精通「作業系統 (OS)」層級的自動化配置。
 
 > [!TIP]
