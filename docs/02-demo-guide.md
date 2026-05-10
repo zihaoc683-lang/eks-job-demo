@@ -177,7 +177,7 @@
     1. **建立政策**：部署 `07-kyverno-policy.yaml`，手冊寫明「禁止 `privileged: true`」。
     2. **提交請求**：工程師執行 `kubectl apply -f 03-bad-pod.yaml`。
     3. **海關攔截**：K8s API Server 問 Kyverno：「這 Pod 符合安全規定嗎？」
-    4. **拒絕入境**：Kyverno 看到違規，回傳 **"Forbidden!*，Pod 完全不會被建立。
+    4. **拒絕入境**：Kyverno 看到違規，回傳 **"Forbidden!"**，Pod 完全不會被建立。
 5.  📢 架構介紹：這就是 Policy as Code。我們將資安準則直接寫入 K8s API 核心，從根源杜絕不安全的容器進入叢集。
 
 ---
@@ -207,6 +207,9 @@
     📢 架構介紹（跨可用區感知）：「在我的 `StorageClass` 設定中，我特別使用了 `WaitForFirstConsumer`。因為 EBS 是綁定特定可用區 (AZ) 的。如果設定成立即建立，硬碟可能會建在 AZ-A，但 Pod 卻被排程到 AZ-B，導致永遠無法掛載。這個設定能確保 K8s 調度器先決定 Pod 落在哪個 Node，再通知 AWS 於『同一個 AZ』建立硬碟，這是多可用區高可用架構的必備設定。」
 
     📢 架構介紹（存儲選型）：「這次 Demo 我選用 EBS，它的特性是 `ReadWriteOnce (RWO)`，適合資料庫這類需要獨佔高效能 IOPS 的應用。如果在真實場景中遇到多個 Pod 需要『同時讀寫』同一份檔案（例如共用的圖片庫），我就會改用 AWS EFS 搭配 `ReadWriteMany (RWX)` 的設定。這展現了根據業務需求選擇正確存儲底層的能力。」
+
+    📢 **技術亮點（災難復原延伸）**：「剛才證明了 Pod 層級的失效可以透過 EBS 復原。但在更極端的災難下（如整個 AWS Region 故障），我會搭配 **Velero** 將 EBS 快照定期備份至跨區域的 S3 儲存桶。這樣結合了『EBS 的高性能』與『Velero 的跨區容災』，才是真正的企業級資料保護方案。」
+
 6.  **🧹 收尾清理**：
     *   **指令**：`kubectl delete pod ebs-test-pod-b --ignore-not-found`
     *   **意義**：釋放 EBS 硬碟綁定，保持環境乾淨。
