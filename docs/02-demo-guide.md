@@ -14,15 +14,26 @@
 
 ## 🛠️ 準備階段 (不可跳過)
 
-### 0.1 基礎設施 (IaC)
-   **📂 涉及檔案**：`terraform/.tf` (主結構定義)
-*   **指令**：`terraform apply -auto-approve`
-*   **意義**：建立 VPC, EKS, RDS, Redis。
+### 0.0 環境檢查與身份驗證 (Connectivity)
+*   **指令**：`aws sts get-caller-identity`
+*   **意義**：確認目前終端機已正確連線至 AWS 帳號，避免因憑證過期導致 Demo 中斷。
 
-### 0.2 平台引導 (Bootstrap)
+### 0.1 基礎設施建置 (IaC)
+*   **📂 涉及檔案**：`*.tf` (主結構定義)
+*   **指令**：
+    1. `terraform init`
+    2. `terraform apply -auto-approve`
+*   **意義**：自動化建立 VPC 網路、EKS 叢集與必要的 IAM 權限。
+
+### 0.2 取得叢集控制權 (Connectivity Upgrade)
+*   **指令**：`aws eks update-kubeconfig --region ap-northeast-1 --name ecommerce-eks-demo`
+*   **檢查**：`kubectl get nodes` (確認所有 Node 狀態為 **Ready**)
+*   **意義**：將雲端 EKS 的連線憑證下載至本地，讓 `kubectl` 指令正式接管叢集。
+
+### 0.3 平台引導 (Bootstrap)
 *   **📂 涉及檔案**：`bootstrap-platform.ps1`
 *   **指令**：`.\bootstrap-platform.ps1`
-*   **意義**：快速佈署 Metrics Server, Argo, Kyverno, Trivy。
+*   **意義**：一鍵佈署維運鐵三角：Metrics Server (監控)、Argo (交付)、Kyverno (政策)、Trivy (掃描)。
 
 ---
 
