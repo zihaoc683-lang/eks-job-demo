@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/YOUR_GITHUB_USERNAME/day5-job-demo.git' # 記得換成您的 GitHub 網址
-    path: k8s/overlays/production
+    repoURL: 'https://github.com/zihaoc683-lang/eks-job-demo.git'
+    path: k8s/base
     targetRevision: HEAD
   destination:
     server: 'https://kubernetes.default.svc'
