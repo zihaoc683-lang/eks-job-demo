@@ -11,7 +11,7 @@ spec:
     # 鎖定穩定版本，避免 Demo 時因為 Chart 更新導致非預期錯誤
     targetRevision: 58.2.1 
     helm:
-      # 設定預設的 admin 密碼，方便面試時展示
+      # 設定預設管理員密碼
       parameters:
         - name: grafana.adminPassword
           value: "admin"

@@ -4,11 +4,11 @@
 
 > [!NOTE]
 > **📚 專案文件導覽 (Index)**
-> - [01. 專案架構與技術決策](01-project-architecture.md) (主管面試必看)
+> - [01. 專案架構與技術決策](01-project-architecture.md) (核心文檔)
 > - [02. 平台工程演示手冊](02-demo-guide.md) (您目前所在位置)
-> - [03. SRE 故障排查與災難復原手冊](03-sre-runbook.md) (展現排障功力)
-> - [04. 雲端成本優化分析](04-cost-analysis.md) (FinOps 亮點)
-> - [05. 面試攻防教戰手冊](05-interview-prep.md) (考題與 JD 對應策略)
+> - [03. SRE 故障排查與災難復原手冊](03-sre-runbook.md) (架構穩健性)
+> - [04. 雲端成本優化分析](04-cost-analysis.md) (FinOps)
+> - [05. 技術架構常見問題與決策解析](05-technical-faq.md) (架構深度)
 
 ---
 
@@ -58,7 +58,7 @@
 > **💡 為什麼不直接用 Terraform 裝？**
 > 雖然 Terraform 也能裝，但透過這個腳本，我們可以：
 > 1. **極速部署**：將原本需要 20 分鐘的雲端等待縮短至 3 分鐘。
-> 2. **展示維運能力**：在面試時向面試官展示您具備「自動化引導 (Bootstrapping)」的思維，而不僅僅是點點網頁。
+> 2. **展現自動化引導 (Bootstrapping) 能力**：透過腳本實現全自動化平台建置，減少人為操作風險。
 
 ---
 
@@ -371,7 +371,6 @@ HIGH: ...
 
     > [!IMPORTANT]
     > **固定密碼**：本專案 admin 密碼已設定為固定值，無需每次查詢。
-    > - 帳號：`admin`
     > - 密碼：**`ArgoDemo2026!`**
     >
     > 若叢集重建後密碼失效，執行下方「**密碼重設**」區塊還原。
@@ -441,7 +440,7 @@ HIGH: ...
 
 1.  **展示 Ansible 腳本與驗證**：
     *   **操作**：打開 VSCode 秀出 `ansible/node-hardening.yml`。
-    *   **解說點 (跨平台與除錯自動化)**：「因為這台展示用的筆電是 Windows，預設無法直接執行 Linux 專用的 Ansible。但在現代 Kubernetes 架構下，我們可以把任何工具『容器化』。我寫了一個腳本，它會自動在 K8s 裡開一個裝好 Ansible 的臨時容器，幫我們檢查這份檔案。」
+    *   **技術說明 (跨平台與除錯自動化)**：「因為這台工作站是 Windows 環境，預設無法直接執行 Linux 專用的 Ansible。但在現代雲端架構下，我們可以將維運工具『容器化』。透過此腳本，系統會自動在 EKS 中建立一個具備 Ansible 環境的臨時容器進行檢查。」
     *   **指令 (觸發容器化語法檢查)**：
         ```powershell
         .\bin\run-ansible.ps1 ansible/node-hardening.yml
@@ -487,16 +486,16 @@ HIGH: ...
         ```
     *   **操作**：打開瀏覽器前往 `http://localhost:3000`。
     *   **帳號密碼**：帳號 `admin`，密碼 `admin` (定義於 `09-observability.yaml` 中)。
-2.  **展示內建儀表板 (Dashboards) — SRE 面試精選建議**：
+2.  **展示內建儀表板 (Dashboards) — 監控要點**：
     *   登入後，點擊左側導覽列的 **Dashboards**。
     *   **推薦優先展示以下三個面板，這最能展現 SRE 的「黃金訊號 (Golden Signals)」監控思維：**
         1.  **`Kubernetes / Compute Resources / Cluster` (最直觀)**：
-            *   **解說點**：展示整個 EKS 叢集的 CPU/Memory 總量與使用率。這能讓面試官看到您對「基礎設施整體健康度」的掌握。
-        2.  **`Kubernetes / Compute Resources / Namespace (Pods)` (聯動場景一)**：
-            *   **解說點**：選擇 `default` 或 `monitoring` 命名空間。配合**場景一 (HPA)** 的壓測，您可以即時看到 Pod 數量增加、CPU 曲線飆升的動態畫面，非常有視覺衝擊力。
+            *   **技術要點**：監控整個 EKS 叢集的 CPU/Memory 資源水位與健康狀況。
+        2.  **`Kubernetes / Compute Resources / Namespace (Pods)` (實務應用)**：
+            *   **技術要點**：選擇 `default` 或 `monitoring` 命名空間。配合壓測場景，可即時觀測 Pod 水平擴展 (HPA) 與資源消耗曲線。
         3.  **`Kubernetes / API server` (展現深度)**：
-            *   **解說點**：監控 API Server 的 Request Latency (延遲) 與 Request Rate。這是 SRE 關注的關鍵效能指標，能證明您有能力診斷 K8s 控制平面的瓶頸，而不僅僅是看 Pod 有沒有跑起來。
-3.  **架構解說 (向面試官說明)**：
+            *   **技術要點**：監控 API Server 的 Request Latency (延遲) 與 Request Rate。這是評估控制平面 (Control Plane) 健康度的關鍵指標。
+3.  **架構解說 (Technical Breakdown)**：
     *   📢 **架構介紹**：「在 K8s 中建立監控系統非常繁瑣，所以我選用了業界標準的 `kube-prometheus-stack` Helm Chart，並結合剛才展示的 Argo CD (GitOps) 進行管理。」
     *   📢 **架構介紹**：「大家現在看到的這些儀表板是隨插即用的。Prometheus 在背景會透過 `ServiceMonitor` 自動發現叢集內的新服務並抓取 Metrics。這意味著未來開發團隊部署新微服務時，只要加上簡單的註解，監控指標就會自動進到這個面板中，實現了『可觀測性即代碼 (Observability as Code)』。」
 4.  **🧹 結束展示與清理**：
