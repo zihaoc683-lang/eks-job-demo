@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/zihaoc683-lang/eks-job-demo.git'
-    path: k8s/base
+    repoURL: 'https://github.com/zihaoc683-lang/eks-job-demo.git' # 自動替換為您的正確網址
+    path: k8s/overlays/production
     targetRevision: HEAD
   destination:
     server: 'https://kubernetes.default.svc'
