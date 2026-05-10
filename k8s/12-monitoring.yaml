@@ -1,0 +1,40 @@
+# =========================================================================
+# 觀測性治理：指標抓取與告警定義 (Observability)
+# =========================================================================
+# 對應職缺要求：「將交付品質用指標量化」、「降低 MTTR」。
+# 1. ServiceMonitor: 讓 Prometheus 自動發現服務，實現「監控即服務 (MaaS)」。
+# 2. PrometheusRule: 定義 SLI/SLO 告警，讓故障能在用戶發現前就被偵測。
+# =========================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ecommerce-backend-monitor
+  labels:
+    release: prometheus-stack # 關聯到 Prometheus Operator
+spec:
+  selector:
+    matchLabels:
+      app: ecommerce-backend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+---
+# 告警治理：定義當錯誤率過高時的告警規則
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ecommerce-alerts
+spec:
+  groups:
+  - name: backend.rules
+    rules:
+    - alert: HighErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "應用程式錯誤率過高"
+        description: "服務 {{ $labels.app }} 的 5xx 錯誤率超過 5%，請立即檢查日誌。"

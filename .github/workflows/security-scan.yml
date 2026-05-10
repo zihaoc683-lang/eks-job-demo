@@ -1,0 +1,41 @@
+# =========================================================================
+# 供應鏈安全檢查 (Supply Chain Security Scan)
+# =========================================================================
+# 對應職缺要求：「供應鏈安全、政策控管、映像掃描」。
+# 我們使用 Trivy 同時掃描 IaC 代碼與 Container Image 漏洞。
+# =========================================================================
+
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  trivy_scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 使用 Trivy 掃描 IaC 設定檔 (Terraform)
+      - name: Run Trivy vulnerability scanner in IaC mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          hide-progress: false
+          format: 'table'
+          exit-code: '1' # 發現高風險漏洞時強制讓流水線失敗
+          severity: 'CRITICAL,HIGH'
+
+      # 使用 Trivy 掃描 Container Image (模擬)
+      - name: Run Trivy vulnerability scanner for Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'stefanprodan/podinfo:6.2.3'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'

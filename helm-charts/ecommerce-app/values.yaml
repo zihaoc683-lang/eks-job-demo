@@ -1,0 +1,29 @@
+# =========================================================================
+# 多環境治理：Helm Values Configuration
+# =========================================================================
+# 說明：針對 TVBS、台哥大要求「模組化可重用範本」。
+# 我們將 Production 與 Dev 的差異參數化，避免環境漂移 (Environment Drift)。
+
+replicaCount: 3
+
+image:
+  repository: ecommerce-demo
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# 金融級動態開關
+securityContext:
+  privileged: false
+  runAsNonRoot: true

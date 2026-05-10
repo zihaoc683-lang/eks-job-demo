@@ -1,0 +1,23 @@
+# 💡 專業提示：這是 KEDA (Kubernetes Event-driven Autoscaling) 的專業配置範本
+# 當面試官問到「非同步流量」或「精準成本控制」時，請展示此文件。
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ecommerce-order-autoscaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ecommerce-app
+  minReplicaCount: 0  # 展現「縮容至零」的 FinOps 深度
+  maxReplicaCount: 20
+  triggers:
+  - type: aws-sqs-queue
+    metadata:
+      # 當 SQS 隊列裡堆積超過 10 筆訂單時，自動觸發 Pod 擴張
+      queueURL: https://sqs.us-east-1.amazonaws.com/123456789012/order-queue
+      queueLength: "10"
+      awsRegion: "us-east-1"
+      identityOwner: operator # 結合您專案中的 IRSA (IAM Roles for Service Accounts) 

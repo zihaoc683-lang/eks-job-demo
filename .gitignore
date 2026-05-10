@@ -1,0 +1,16 @@
+.terraform/
+.terraform.*
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+
+# Binaries / Executables
+bin/
+*.exe
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/

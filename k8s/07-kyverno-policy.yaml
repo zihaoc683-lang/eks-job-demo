@@ -1,0 +1,76 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy # ClusterPolicy = 全叢集生效；若用 Policy 則只管單一 Namespace
+metadata:
+  name: disallow-privileged-containers
+spec:
+  validationFailureAction: Enforce # Enforce = 直接擋掉；Audit = 只記錄不阻擋（測試期用）
+  background: true                 # 讓 Kyverno 背景掃描已存在的資源並產生合規報告
+  rules:
+
+  # 規則一：禁止特權容器
+  # privileged: true 讓容器獲得宿主機 root 權限，攻擊者可藉此逃逸並控制整個 Node
+  - name: validate-privileged
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod # 只審查 Pod，因為 container 定義在 Pod 裡
+    # [業界實戰標配]：白名單排除 (Exclusion)
+    # kube-system 裡的系統元件 (如 aws-node, ebs-csi) 必須使用特權才能運作。
+    # 若不排除這些系統 Namespace，嚴格的 Policy 會把自家叢集搞垮！
+    exclude:
+      any:
+      - resources:
+          namespaces:
+          - kube-system
+          - kyverno
+    validate:
+      message: "不允許建立特權容器！這違反了公司的安全基準政策。"
+      foreach:
+      # 用 foreach 而非 pattern，因為一個 Pod 可能有多個 container（如 sidecar）
+      # foreach 會逐一檢查每個 container，確保沒有任何一個是特權的
+
+      # [掃描對象 1]：主容器（一般應用程式跑在這裡）
+      - list: "request.object.spec.containers" # request.object = 這次 API 請求的 Pod YAML
+        deny:
+          conditions:
+            any:
+            - key: "{{ element.securityContext.privileged || false }}"
+              # element = 當前迭代到的 container；|| false = 欄位不存在時預設 false 避免報錯
+              operator: Equals
+              value: true # privileged == true → 觸發 deny → Pod 被拒絕
+
+      # [掃描對象 2]：初始化容器（initContainers）
+      # initContainers 在主容器啟動「之前」執行，常用於初始化設定。
+      # 若不單獨掃描，攻擊者可在 initContainers 裡藏入 privileged: true 繞過上面的規則！
+      # 這是業界 Policy as Code 的標準做法：containers 和 initContainers 都要查。
+      - list: "request.object.spec.initContainers || `[]`"
+        # || `[]` = 如果 Pod 沒有定義 initContainers，就預設為空陣列，避免查詢報錯
+        deny:
+          conditions:
+            any:
+            - key: "{{ element.securityContext.privileged || false }}"
+              operator: Equals
+              value: true
+
+  # 規則二：限制映像檔來源
+  # 防止工程師誤用公開 Registry 上的惡意映像（供應鏈攻擊 Supply Chain Attack）
+  - name: check-image-registry
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    exclude:
+      any:
+      - resources:
+          namespaces:
+          - kube-system
+          - kyverno
+    validate:
+      message: "不允許使用未經授權的映像檔來源！請使用 ghcr.io 或官方來源。"
+      pattern:
+        spec:
+          containers:
+          - image: "ghcr.io/* | stefanprodan/* | alpine"
+            # | 代表「或」；不在清單內的來源（如 docker.io/nginx）一律拒絕

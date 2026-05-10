@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-pod-security-violation # 命名刻意加上 violation，清楚標示這是違規示範
+spec:
+  containers:
+  - name: bad-pod
+    image: alpine          # alpine = 超輕量 Linux 映像，常用於測試指令
+    command: ["sleep", "3600"] # 讓容器持續存活 1 小時，方便觀察
+    securityContext:
+      privileged: true     # ⚠️ 違規點！讓容器獲得宿主機 root 權限，極度危險
+                           # Kyverno 的 validate-privileged 規則會在 Admission 階段攔截這個欄位

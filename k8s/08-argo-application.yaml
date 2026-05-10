@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ecommerce-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/YOUR_GITHUB_USERNAME/day5-job-demo.git' # 記得換成您的 GitHub 網址
+    path: k8s/overlays/production
+    targetRevision: HEAD
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true # 這是修復 Drift (配置偏移) 的關鍵

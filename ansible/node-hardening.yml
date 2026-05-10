@@ -1,0 +1,61 @@
+# =========================================================================
+# 企業級自動化維運：EKS 節點安全性加固與優化劇本 (Ansible Node Hardening)
+# =========================================================================
+# 💡 面試知識點 (JD 對應：具備 Linux 與網路基礎及排障能力、自動化能力)
+# 
+# 1. 為什麼要用 Ansible？
+#    - Terraform 負責「蓋房子」(Provisioning 雲端資源如 VPC, EC2)。
+#    - Ansible 負責「裝潢與安全」(Configuration Management)，確保 OS 層級合規。
+#    - Kubernetes 負責「住進去」(Container Orchestration)。
+#    三者職責明確，是業界最佳實踐。
+#
+# 2. 為什麼 EKS 節點還需要 Node Hardening？
+#    - 雖然 K8s 有 Pod 隔離，但底層 EC2 (Worker Node) 如果被攻破，整個叢集都會淪陷。
+#    - 企業合規要求（如 ISO27001、金融業規範）通常要求 OS 層級必須定期更新、統一時區與防護。
+# =========================================================================
+
+- name: EKS Node Security Hardening & Troubleshooting Tools Setup
+  hosts: eks_nodes
+  become: yes # 提權為 root 執行，確保有權限修改系統核心設定
+  tasks:
+    # 💡 知識點：Patch Management (補丁管理)。資安最基本也最重要的一環，自動修補已知 OS 漏洞。
+    - name: 1. 更新系統所有套件至最新安全版本 (Patch Management)
+      dnf:
+        name: "*"
+        state: latest
+      tags: security
+
+    # 💡 知識點：標準化排障工具包。避免 SRE 在緊急事故 (Incident) 發生時，還要花時間下載工具。
+    - name: 2. 安裝核心維運工具 (SRE Essential Tools)
+      dnf:
+        name:
+          - htop      # 資源監控：快速查看 CPU/Memory 是否被異常 process 佔用
+          - telnet    # 網絡連線排查：測試 port 是否有通 (網路排障基本功)
+          - tcpdump   # 抓包分析：深層網路問題排查 (Packet Sniffing)
+          - jq        # JSON 處理：CLI 處理 K8s API 回傳的 JSON 必備工具
+          - tmux      # 終端機多工：防止斷線導致長時間運行的排障指令中斷
+        state: present
+
+    # 💡 知識點：統一時間軸。當發生資安事件需要跨系統比對 Log 時，如果時區不一致會造成災難。
+    - name: 3. 設定系統時區為 Asia/Taipei (金融/電信業審計合規要求)
+      timezone:
+        name: Asia/Taipei
+
+    # 💡 知識點：高併發優化。K8s 節點通常需要處理大量微服務網路連線。
+    # 預設的 somaxconn (Socket Listen Backlog) 通常只有 128，在大流量時會導致連線被拒絕。
+    # 這裡將其調高至 1024，展現您對於 Linux 網路底層調優的實務經驗。
+    - name: 4. 優化核心連線參數 (TCP Optimization)
+      sysctl:
+        name: net.core.somaxconn
+        value: '1024'
+        state: present
+        reload: yes
+
+    # 💡 知識點：無密碼遠端登入與安全稽核。
+    # 傳統 SSH 需要管理金鑰，風險較高。SSM Agent 允許透過 AWS Console 安全地連線到節點，
+    # 且所有的終端機操作都會被 AWS CloudTrail 記錄下來，滿足最高級別的資安稽核要求。
+    - name: 5. 確保 Amazon SSM Agent 正在運行 (現代化遠端排障基礎)
+      systemd:
+        name: amazon-ssm-agent
+        state: started
+        enabled: yes
