@@ -1,73 +1,66 @@
-# 🏗️ 專案架構與技術決策 (Project Architecture & Technical Merits)
+# 🏗️ EKS 雲端架構與技術決策 (01)
 
-本文件整合了本專案的基礎設施藍圖、DevSecOps 治理策略與各項技術選型的深度解析。目標在於展示一個具備生產級別 (Production-Ready) 的 EKS 雲端架構設計。
-
-![EKS Architecture](../images/aws_eks_architecture_2d.png)
+本專案不僅是一個 EKS 叢集，更是一個完整的**平台工程 (Platform Engineering) 解決方案**。架構設計核心圍繞著「安全性」、「自癒力」與「可自動化」三大核心指標。
 
 ---
 
-## 🌟 核心架構亮點 (Technical Merits)
+## 🏛️ 架構全景圖 (High-Level Architecture)
 
-### 1. 零信任與多層次安全防禦 (Defense-in-Depth)
+### 1. 核心基礎設施 (The Core)
+*   **雲端環境**：AWS (VPC, EKS, IAM, EBS)
+*   **計算資源**：EKS Managed Node Groups (基於 `t3.small` 的 Auto Scaling Group)。
+*   **網路架構**：
+    *   **Public Subnets**：部署 AWS Load Balancers (NLB/ALB)。
+    *   **Private Subnets**：部署 EKS 節點與應用程式，確保不直接曝露於 Internet。
+    *   **NAT Gateway**：讓 Private Subnets 內的節點能安全地拉取外部 Docker Image。
 
-| 防禦層 | 技術手段 | 實踐位置 |
-| :--- | :--- | :--- |
-| **基礎網路隔離** | 透過 VPC 將 Worker Nodes 放置於 Private Subnet，阻斷外部直接存取。 | [vpc.tf](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/vpc.tf) — `private_subnets` + `single_nat_gateway` |
-| **K8s 網路微隔離** | 實作 Default Deny 原則，僅允許授權的 Pod 互相通訊。 | Kubernetes NetworkPolicy |
-| **准入控制 (Kyverno)** | 在 API Server 階段攔截非授權映像檔與特權容器，從源頭斬斷漏洞。 | [k8s/07-kyverno-policy.yaml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/07-kyverno-policy.yaml) |
-| **左移資安 (Shift-Left)** | Trivy + GitHub Actions，在 CI 與 Runtime 階段雙重封殺已知漏洞 (CVE)。 | [.github/workflows/security-scan.yml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/.github/workflows/security-scan.yml) |
+### 2. 零信任安全防禦體系 (Zero Trust Security Stack)
 
----
+本架構遵循「永不信任，始終驗證」的零信任原則，建立多層次的防護網：
 
-### 2. 高可用性與雲端 API 整合 (HA & AWS API Integration)
+#### 🔹 身分即邊界：IAM Roles for Service Accounts (IRSA)
+本專案的安全核心。捨棄寬鬆的 Node Role，改用 OIDC 將 IAM 直接綁定至 K8s Service Account。這實現了**身分基礎的最小權限原則 (Identity-based Least Privilege)**，即使攻擊者攻破單一 Pod，也無法獲取其他雲端資源的存取權，大幅限縮了「爆炸半徑」。
 
-#### 🔹 多可用區部署 (Multi-AZ)
+#### 🔹 持續性准入驗證：政策治理 (Kyverno)
+*   **零信任稽核**：利用 K8s Admission Webhook 在資源建立前進行 100% 攔截驗證。
+*   **強制合規**：透過代碼化的政策 (Policy as Code)，強制執行資安準則，不依賴人為判斷。
 
-底層 VPC 與 EKS 跨多個 AZ 部署，避免單一資料中心故障導致停機。
+#### 🔹 映像檔安全 (Trivy Operator)
+*   **Runtime Scanning**：自動掃描叢集中運行的所有 Pod，產出 CVE 漏洞報告，實現持續性資安監控。
 
-> **實踐位置**：[vpc.tf](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/vpc.tf) — `azs = slice(..., 0, 2)` 取前兩個可用區。
-
-#### 🔹 IAM Roles for Service Accounts (IRSA)
-
-本專案的安全核心。捨棄寬鬆的 Node Role，改用 OIDC 將 IAM 直接綁定至 K8s Service Account。實現「最小權限原則」，防止攻擊者透過受損 Pod 進行雲端資源的側向移動。
-
-**深入解析：為什麼選擇 IRSA 而非傳統 Node IAM Role？**
-
-| 特性 | 傳統 Node IAM Role | IRSA |
-| :--- | :--- | :--- |
-| **權限範圍** | **主機級別**：所有 Pod 共用同一權限集。 | **Pod 級別**：每個 Pod 獨立隔離。 |
-| **最小權限** | **難以實現**：Pod A 需要 S3，Pod B 也會獲得。 | **完美實踐**：Pod A 拿 S3，Pod B 拿 EBS，互不干涉。 |
-| **安全性** | **高風險**：任一 Pod 被攻破，攻擊者取得節點整體權限。 | **低風險**：權限僅侷限於該 Pod 專屬的 IAM Role。 |
-| **身份驗證** | EC2 Metadata (IMDS)，容易被偽造。 | OIDC + AWS STS 臨時憑證，安全性更高。 |
-
-> **關鍵價值**：透過 **EKS OIDC Provider** 實現細粒度隔離。確保 `ebs-csi-driver` 僅能操作磁碟而無法存取 S3 等敏感資源，符合金融級 (PCI-DSS) 資安稽核。
-
-#### 🔹 彈性與負載平衡
-
-結合 AWS ALB/NLB 與 Kubernetes HPA，透過 AWS Load Balancer Controller 自動化管理雲端網路資源。
-
-#### 🔹 自動化儲存治理 (AWS EBS CSI)
-
-自動化管理磁碟生命週期。並透過 `WaitForFirstConsumer` 延遲綁定技術，確保「磁碟跟隨 Pod」於同一可用區 (AZ) 建立，解決 EBS 跨區掛載失敗的硬傷。
+### 3. 資料持久化 (Persistence)
+*   **AWS EBS CSI Driver**：透過 Dynamic Provisioning 自動化管理雲端硬碟。
+*   **StorageClass 設計**：採用 `WaitForFirstConsumer` 策略，解決跨可用區 (Multi-AZ) 掛載失敗的經典問題。
 
 | 層級 | 實踐位置 | 說明 |
 | :--- | :--- | :--- |
-| **基礎設施層** | [eks.tf](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/eks.tf) — `cluster_addons` | 啟用 `aws-ebs-csi-driver` 並透過 `ebs_csi_irsa_role` 配置 IRSA 授權。 |
-| **應用定義層** | [k8s/01-storage.yaml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/01-storage.yaml) | 定義 `StorageClass`，指定 `provisioner: ebs.csi.aws.com` + `WaitForFirstConsumer`。 |
+| **基礎設施層** | [eks.tf](eks.tf) — `cluster_addons` | 啟用 `aws-ebs-csi-driver` 並透過 `ebs_csi_irsa_role` 配置 IRSA 授權。 |
+| **應用定義層** | [k8s/01-storage.yaml](k8s/01-storage.yaml) | 定義 `StorageClass`，指定 `provisioner: ebs.csi.aws.com` + `WaitForFirstConsumer`。 |
 
----
-
-### 3. 持續交付與 GitOps (Continuous Delivery)
+### 4. 可觀測性與監控 (Observability)
 
 | 能力 | 說明 | 實踐位置 |
 | :--- | :--- | :--- |
-| **唯一真相來源** | 透過 Argo CD 實現基礎設施狀態與 GitHub 儲存庫的強制同步。 | [k8s/08-argo-application.yaml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/08-argo-application.yaml) |
-| **配置偏移修復** | 當線上環境遭到人為篡改時，Argo CD 會在 3 分鐘內自動修復回 Git 上的原始設定。 | Argo CD 內建 Drift Detection |
-| **漸進式交付** | 金絲雀發布 (Canary)，精準控制「爆炸半徑」，支援秒級回滾。 | [k8s/02-rollout.yaml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/02-rollout.yaml) — `Rollout` + `canary` 策略 |
+| **全方位監控 (Prometheus)** | 透過 Prometheus 自動收集 K8s 叢集與應用的效能指標 (Metrics)。 | `kube-prometheus-stack` (Helm Chart) |
+| **視覺化儀表板 (Grafana)** | 提供預設的 K8s 監控面板，方便快速查看 CPU/Memory 使用率與系統瓶頸。 | [k8s/09-observability.yaml](k8s/09-observability.yaml) |
 
 ---
 
-## 🛠️ 架構演進與技術選型 (Evolution & Choices)
+## 📈 SRE 指標達成策略 (MTTR / RTO / RPO)
+
+本架構在設計時，特別針對 SRE 三大核心指標進行了優化，確保系統具備生產級別的彈性：
+
+### 📊 SRE 服務等級指標預估 (SLA Estimates)
+
+| 指標 | 預估時間 | 實踐技術支撐 |
+| :--- | :--- | :--- |
+| **RTO** (復原時間) | **15 - 20 分鐘** | Terraform 自動化基礎設施重建 (12m) + Bootstrap 平台引導 (3m)。 |
+| **RPO** (數據丟失點) | **< 1 分鐘** | AWS EBS 持久化儲存 (近乎即時) + GitOps 唯一真相來源 (0 延遲)。 |
+| **MTTR** (平均修復時間) | **30 秒 - 5 分鐘** | K8s Pod 自癒 (30s) + Argo CD 自動偏移修復 (3m) + SRE Runbook 標準化操作。 |
+
+---
+
+## 🛠️ 開發與維運流程 (DevOps Workflow)
 
 在建置此專案時，我面臨了多種技術選擇，以下為最終選型的商業與技術考量：
 
@@ -94,8 +87,8 @@
 
     | 層級 | 路徑 | 用途 |
     | :--- | :--- | :--- |
-    | **Base 層** | [k8s/base](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/base) | 存放核心的 `Deployment` 與 `Service`，作為所有環境的共同基石。 |
-    | **Overlay 層** | [k8s/overlays](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/k8s/overlays) | `production` 目錄透過 `patches` 覆寫參數，實現「一套代碼，多環境運行」。 |
+    | **Base 層** | [k8s/base](k8s/base) | 存放核心的 `Deployment` 與 `Service`，作為所有環境的共同基石。 |
+    | **Overlay 層** | [k8s/overlays](k8s/overlays) | `production` 目錄透過 `patches` 覆寫參數，實現「一套代碼，多環境運行」。 |
 
 ### 安全政策引擎：Kyverno vs OPA Gatekeeper
 
@@ -110,5 +103,6 @@
 
 | 治理能力 | 說明 | 實踐位置 |
 | :--- | :--- | :--- |
-| **作業系統加固 (Ansible)** | 透過 Ansible 在 EC2 啟動時自動關閉危險端口、提升網路參數，並確保 SSM Agent 啟用以供無密碼安全審計。 | [ansible/node-hardening.yml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/ansible/node-hardening.yml) |
-| **IaC 靜態安全掃描 (Checkov)** | 在 GitHub Actions 中強制執行 Checkov，防止提交「開啟 Public Access 的 S3」或「未加密的 EBS」等高危險代碼。 | [security-scan.yml](file:///c:/Users/kilok/Desktop/%E7%B7%AF%E8%82%B2/eks-project/day5-job-demo/.github/workflows/security-scan.yml) |
+| **資源消耗限制 (Quotas)** | 透過 Kustomize Patch 強制所有 Pod 必須定義 Resource Requests/Limits，防止鄰居干擾。 | [k8s/base/deployment.yaml](k8s/base/deployment.yaml) |
+| **節點親和性 (Affinity)** | 確保關鍵服務部署於指定的 Instance Types。 | [eks.tf](eks.tf) (`labels`) |
+| **事件追蹤 (Audit)** | 透過 K8s Events 追蹤所有變更，並與 Prometheus Alertmanager 整合。 | `monitoring` namespace |

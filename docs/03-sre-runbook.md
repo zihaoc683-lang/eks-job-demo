@@ -1,6 +1,6 @@
 # 🚨 SRE 故障排查與災難復原手冊 (SRE Runbook & DR Strategy)
 
-本手冊定義了平台工程與 SRE 團隊在面臨生產環境突發事件 (Incidents) 時的標準作業程序 (SOP)。目標是透過高度結構化的排障思維，將 MTTR (平均修復時間) 降至最低。
+本手冊定義了平台工程與 SRE 團隊在面臨生產環境突發事件 (Incidents) 時的標準作業程序 (SOP)。目標是透過高度結構化的排障思維，將 **MTTR (平均修復時間)** 降至最低。
 
 ## 🎯 故障排查核心心法 (Troubleshooting Philosophy)
 
@@ -55,6 +55,33 @@
 1. **更新憑證**：執行 `aws eks update-kubeconfig --region ap-northeast-1 --name <cluster-name>` 重新綁定最新 API。
 2. **執行引導程序 (Bootstrap)**：在套用任何業務邏輯前，必須先確保平台組件 (如 Argo CD, Kyverno) 已就緒。請執行 `.\bootstrap-platform.ps1` 為新叢集安裝必要的 CRD 與控制器。
 
+### 情境 5：Pod 狀態為 Pending，錯誤訊息顯示 "Too many pods"
+**發生原因**：觸碰到了 AWS EKS 的 **ENI Pod Limit**。
+在 AWS 中，每種實例型號都有最大 Pod 承載量（例如 `t3.small` 僅 11 個）。
+*📍 **實戰案例**：本專案在執行 **「場景九：可觀測性監控」** 時，由於 Prometheus 堆疊包含多個組件，與原有的 Argo、Kyverno、Trivy 等維運工具加總後，Pod 總數超過了 3 台節點的承載上限 (33 個)，導致核心組件無法調度。*
+
+**解決方案**：
+1. **橫向擴展 (Horizontal Scale)**：修改 `eks.tf` 中的 `desired_size` 增加節點數量，分攤 Pod 壓力。
+2. **開啟前綴委派 (Prefix Delegation)**：執行 `kubectl set env daemonset aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true`，這能將單機配額大幅提升（如 t3.small 從 11 變為 110）。
+
+> [!IMPORTANT]
+> **💡 SRE 深層技術筆記：為什麼 Terraform apply 沒反應？**
+> 在使用 `terraform-aws-modules/eks` 時，為了配合 **Cluster Autoscaler** 自動擴縮，模組內建了 `lifecycle { ignore_changes = [scaling_config[0].desired_size] }` 策略。
+> **發生情境**：當我們在 **「場景九」** 發現資源不足試圖透過 Terraform 增加 `desired_size` 時，會發現 Terraform 認為「這是應該交給自動擴展器管理的屬性」而忽略變更，導致顯示 `No changes`。
+> **解決方案**：在緊急情況下（如 Demo 資源不足），應直接使用 AWS CLI 強制更新：
+> `aws eks update-nodegroup-config --cluster-name <name> --nodegroup-name <node-group-name> --scaling-config desiredSize=<count>`
+
+*📢 **SRE 建議**：在 Demo 情境下，建議直接增加節點數量 (方案 1)，這最能體現 IaC 的彈性管理能力。*
+
+### 情境 6：套用大型 YAML (如 CRD) 時出現 "metadata.annotations: Too long"
+**發生原因**：`kubectl apply` 預設會將完整的物件內容存放在 Annotation 中。當部署像 Prometheus 這種超大型的自定義資源定義 (CRD) 時，會超過 K8s 的長度限制 (256KB)。
+*📍 **實戰案例**：在本專案修復 **「場景九」** 缺失的 Prometheus CRD 時遇到此報錯。*
+**解決方案**：
+改用 **Server-side Apply**。這會將合併邏輯交給伺服器處理，不依賴本地 Annotation：
+```powershell
+kubectl apply --server-side -f <URL_OR_FILE>
+```
+
 ---
 
 ## 🛡️ 災難復原策略 (Disaster Recovery Strategy)
@@ -73,3 +100,25 @@
 ### 3. GitOps 一鍵復原
 *   所有的微服務應用程式配置皆存放於 GitHub，Argo CD 作為單一真相守護者。
 *   當新叢集建立完成並安裝 Argo CD 後，它將自動掃描 GitHub，並在數分鐘內將數百個微服務「自動部署並配置到位」，達成極致的自動化災難復原。
+
+---
+
+## 🧰 SRE 專業偵錯工具箱 (The Tooling)
+
+在 K8s 叢集中，應用容器通常是最小化映像檔 (Distroless)，缺乏網路排障工具。當發生複雜網路問題時，我們統一使用 **`netshoot`** 進行診斷：
+
+### 快速啟動偵錯容器
+```powershell
+kubectl run netshoot --rm -i --tty --image nicolaka/netshoot -- /bin/bash
+```
+
+### 必備診斷指令
+*   **DNS 解析檢查**：`nslookup <service-name>` (檢查 CoreDNS 是否正常)
+*   **端點連通性檢查**：`curl -v <cluster-ip>:<port>` (檢查 L7 響應)
+*   **網路路徑追蹤**：`mtr -n <target-ip>` (檢查是否有跳轉丟包)
+*   **封包監聽**：`tcpdump -i any port <port>` (觀察交握過程)
+
+---
+
+## 🧹 事故總結與環境恢復 (Cleanup)
+完成排障後，務必確保移除所有臨時偵錯用的 Pod 與 Service，保持叢集乾淨與安全。

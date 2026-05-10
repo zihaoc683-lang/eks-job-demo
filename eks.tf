@@ -54,7 +54,7 @@ module "eks" {
       max_size     = 5
       # 預設 3 台。注意：若安裝了 Prometheus 等大量組件，t3.small 的 ENI 限制 (11 pod/node) 
       # 可能會導致 Pod 卡在 Pending，此時請將此數值調升至 4 或 5。
-      desired_size = 3
+      desired_size = 4
 
       # 使用 t3.small (2 vCPU, 2GB RAM)：足夠運行我們的電商 Demo 應用
       instance_types = ["t3.small", "t3.medium"] # 增加備選機型提高 Spot 獲得率

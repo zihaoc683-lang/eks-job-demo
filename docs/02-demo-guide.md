@@ -237,19 +237,33 @@
 
 ---
 
-## 🎭 場景五：資安漏洞自動掃描 (Trivy)
-**📂 涉及檔案**：(平台級件，由 Bootstrap 腳本安裝)
-1.  **指令**：`kubectl get vulnerabilityreports -A`
-2.  **預期結果**：你會看到滿滿的系統元件（如 `kube-system` 或 `kyverno`）的掃描報告。這證明了即使你在 `default` 沒有部署應用，平台也已經在自動防護了。
-3.  📢 架構介紹（Runtime Scanning）：「透過部署 Trivy Operator，我們將資安掃描 (Image Scanning) 從 CI pipeline 延伸到了 Kubernetes 運行時 (Runtime)。只要任何 Pod 跑在這個叢集上，Trivy 就會在背景自動掃描它的已知漏洞 (CVE)。」
-4.  **進階指令 (查看漏洞細節)**：
-    ```powershell
-    # 隨便挑一個報告來看細節 (這裡以 coredns 為例)
-    kubectl get vulnerabilityreports replicaset-coredns-6b8858d7f5-coredns -n kube-system -o yaml | Select-String -Pattern "vulnerabilityID|severity" | Select-Object -First 10
-    ```
-5.  **🔍 進階技術說明（DevSecOps 藍圖）**：
+## 🎭 場景五：資安漏洞自動掃描 (Trivy Operator)
+**📂 涉及檔案**：(平台組件，由 Bootstrap 腳本安裝)
 
-    📢 架構介紹（告警與阻擋）：「在真實的生產環境中，只產出報告是不夠的。我的下一步架構規劃是：第一，讓 Prometheus 收集 Trivy 的 Metrics 建立 Grafana 儀表板，當出現 Critical 漏洞時自動發送 Slack 告警。第二，將 Trivy 與我們剛剛演示的 Kyverno 聯動，如果 Image 包含未修復的高危漏洞，Kyverno 將直接在 Admission 階段阻擋部署，實現真正的 DevSecOps 閉環 (Closed Loop)。」
+### 💡 運作原理 (Working Principle)
+*   **事件驅動 (Event-driven)**：Trivy Operator 監聽 K8s API，一旦有新 Pod 生成，立即觸發掃描任務 (Scan Job)。
+*   **資源化報告**：掃描結果直接轉化為 K8s 的 **Custom Resource (CRD)**，讓 SRE 能用原生指令 `kubectl get vulnerabilityreports` 進行審計。
+*   **持續監控**：除了初次生成，系統也會定時複查 (預設 24h)，確保發現最新的漏洞 (Zero-day)。
+
+### 演示步驟
+1.  **查看全叢集漏洞報告**：
+    ```powershell
+    kubectl get vulnerabilityreports -A
+    ```
+2.  **查看特定應用的詳細漏洞 (以 Prometheus 為例)**：
+    ```powershell
+    kubectl get vulnerabilityreports -n monitoring
+    ```
+3.  **進階：查看漏洞細節 (以 CoreDNS 為例)**：
+    ```powershell
+    # 透過 Select-String 過濾出漏洞 ID 與嚴重等級
+    kubectl get vulnerabilityreports -n kube-system -o yaml | Select-String -Pattern "vulnerabilityID|severity" | Select-Object -First 15
+    ```
+4.  📢 **解說詞**：
+    > 「我們引入了 Trivy Operator 實現了 **Continuous Security**。這讓資安掃描從 CI 階段延伸到了運行時 (Runtime)。維運人員不需要切換工具，直接透過 `kubectl` 就能掌握全叢集的安全狀態，甚至能細看每一個漏洞的 CVE 編號。這展現了 **Security as Data** 的現代運算思維。」
+
+4.  **🔍 進階技術說明（DevSecOps 藍圖）**：
+    > 「在真實生產環境中，我會將 Trivy 與 **Kyverno** 聯動。如果掃描報告顯示包含 Critical 等級的漏洞，政策引擎會自動禁止該 Pod 的執行，實現自動化的安全治理閉環。」
 
 ---
 
@@ -441,7 +455,8 @@ HIGH: ...
             4. **優化網路參數**：把作業系統的網路連線上限 (`somaxconn`) 調高，讓 K8s 節點能承受更大流量。
             5. **確保 SSM Agent 執行中**：確保我們能安全地遠端連線進機器排障。
            **畫面上的 `[WARNING]` 是報錯嗎？** 不是報錯，是**好消息**！這些警告只是在說：「你沒告訴我要連去哪台機器 (No inventory)」。這非常合理，因為我們只是在做「語法檢查」，本來就沒有要它真的連線去改機器。
-        *   **哪裡看出來成功了？** 只要最後一行印出 `playbook: /playbook/node-hardening.yml`，且沒有出現紅色的 `ERROR` 字眼，就代表這份腳本語法 100% 正確，可以隨時投入生產環境使用。
+        *   **哪裡看出來成功了？** 只要最後一行印出 `playbook: /playbook/node-hardening.yml`，且沒有出現紅色的 `ERROR` 
+        字眼，就代表這份腳本語法 100% 正確，可以隨時投入生產環境使用。
 
 2.  **解說 IaC 工具的職責邊界 (高階架構視野)**：
     *   📢 **向團隊總結 (大樓與房間的比喻)**：「很多工程師只會管 Kubernetes 裡面的 Pod，卻忘記了底層的 Linux 伺服器如果不安全，駭客一樣能攻破。我們可以把雲端架構想像成一棟大樓：

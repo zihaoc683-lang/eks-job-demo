@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://prometheus-community.github.io/helm-charts'
+    chart: kube-prometheus-stack
+    # 鎖定穩定版本，避免 Demo 時因為 Chart 更新導致非預期錯誤
+    targetRevision: 58.2.1 
+    helm:
+      # 設定預設的 admin 密碼，方便面試時展示
+      parameters:
+        - name: grafana.adminPassword
+          value: "admin"
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
