@@ -1,4 +1,4 @@
-﻿# 🏗️ 專案架構與技術決策 (Project Architecture & Technical Merits)
+# 🏗️ 專案架構與技術決策 (Project Architecture & Technical Merits)
 
 本文件整合了本專案的基礎設施藍圖、DevSecOps 治理策略與各項技術選型的深度解析。目標在於展示一個具備生產級別 (Production-Ready) 的 EKS 雲端架構設計。
 
@@ -12,10 +12,11 @@
 *   **准入控制與政策即代碼 (Kyverno)**：在 API Server 階段攔截非授權映像檔與特權容器 (Privileged Containers)，從源頭斬斷漏洞。
 *   **持續自動化掃描 (Trivy + GitHub Actions)**：實現「左移資安 (Shift-Left)」，在 CI 階段與 Runtime 階段雙重封殺已知漏洞 (CVE)。
 
-### 2. 高可用性與自癒能力 (High Availability & Self-Healing)
+### 2. 高可用性與雲端 API 整合 (HA & AWS API Integration)
 *   **多可用區部署 (Multi-AZ)**：底層 VPC 與 EKS 跨多個 AZ 部署，避免單一資料中心故障導致停機。
-*   **彈性與負載平衡**：結合 AWS ALB/NLB 與 Kubernetes HPA，依據流量動態調整資源。
-*   **儲存高可用 (AWS EBS CSI)**：利用 WaitForFirstConsumer 策略，確保 Pod 與資料磁碟的 AZ 對齊，防止資料庫 Pod 調度失敗。
+*   **IAM Roles for Service Accounts (IRSA)**：這是本專案的核心安全亮點。我們不使用寬鬆的 Node IAM Role，而是透過 OIDC 供應商將 IAM Role 直接綁定到 K8s Service Account。例如，`aws-ebs-csi-driver` 僅具備操作 EBS 的權限，實現了「最小權限原則 (Principle of Least Privilege)」的雲端 API 呼叫。
+*   **彈性與負載平衡**：結合 AWS ALB/NLB 與 Kubernetes HPA，透過 AWS Load Balancer Controller 自動化管理雲端網路資源。
+*   **儲存高可用 (AWS EBS CSI)**：利用 `WaitForFirstConsumer` 策略，確保 Pod 與資料磁碟的 AZ 對齊，防止資料庫 Pod 調度失敗。
 
 ### 3. 持續交付與 GitOps (Continuous Delivery)
 *   **唯一真相來源 (Single Source of Truth)**：透過 Argo CD 實現基礎設施狀態與 GitHub 儲存庫的強制同步。

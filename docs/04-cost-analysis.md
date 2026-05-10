@@ -14,7 +14,7 @@
 | `capacity_type = "SPOT"` | **核心省錢亮點**：使用 Spot 實例節省約 70~90% 的運算費用 |
 | `single_nat_gateway = true` | Demo 環境只建一個 NAT GW，避免每 AZ 各一個造成約 2 倍費用 |
 | `instance_types = ["t3.small", "t3.medium"]` | Spot 模式下混合機型，確保在低成本下仍有極高的資源獲得率 |
-| `max_size = 3` | 設置 Node 數量上限，防止 HPA 測試時因 Bug 或壓測失控造成無限擴機的鉅額帳單 |
+| `max_size = 5` | 設置 Node 數量上限，防止 HPA 測試時因 Bug 或壓測失控造成無限擴機的鉅額帳單 |
 
 這些決策不是偶然為之，而是在設計 Terraform 時就主動做出的工程取捨，展現了**成本意識（Cost Awareness）**是雲端架構師的基本素養。
 
@@ -114,19 +114,19 @@ single_nat_gateway   = true   # ← 這裡是關鍵
 - **取捨說明**：單一 NAT GW 是 **單點故障（SPOF）**，若 NAT GW 所在 AZ 發生故障，所有私有子網的出站流量都會中斷。Demo 環境可以接受此風險；生產環境應改用 `one_nat_gateway_per_az = true`。
 - **這展現什麼能力**：能量化分析架構決策的財務影響，且清楚知道 Dev 與 Prod 環境的取捨邊界。
 
-### 決策 2：`max_size = 3`（Node Group 上限保護）
+### 決策 2：`max_size = 5`（Node Group 上限保護）
 ```hcl
 # eks.tf
 eks_managed_node_groups = {
   default = {
     min_size     = 1
-    max_size     = 3   # ← 防止無限擴容的保護機制
-    desired_size = 2
+    max_size     = 5   # ← 防止無限擴容的保護機制
+    desired_size = 3
   }
 }
 ```
-- **成本影響**：若 HPA 因 Bug 觸發無限擴容（例如 CPU 指標異常），最多只會建立 3 台 Node，而不是 30 台。
-- **財務保護**：3 台 t3.small = 約 $58.75/月 vs. 30 台意外擴容 = 約 $587/月，**一個參數保護了 10 倍的潛在額外支出**。
+- **成本影響**：若 HPA 因 Bug 觸發無限擴容（例如 CPU 指標異常），最多只會建立 5 台 Node，而不是 50 台。
+- **財務保護**：5 台 t3.small = 約 $97.90/月 vs. 50 台意外擴容 = 約 $979/月，**一個參數保護了 10 倍的潛在額外支出**。
 - **這展現什麼能力**：理解雲端費用的不可預測性，主動設計防護機制，體現 FinOps（雲端財務管理）思維。
 
 ### 決策 3：EBS Volume Type 選擇 `gp3`

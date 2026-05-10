@@ -1,4 +1,4 @@
-﻿# 🚨 SRE 故障排查與災難復原手冊 (SRE Runbook & DR Strategy)
+# 🚨 SRE 故障排查與災難復原手冊 (SRE Runbook & DR Strategy)
 
 本手冊定義了平台工程與 SRE 團隊在面臨生產環境突發事件 (Incidents) 時的標準作業程序 (SOP)。目標是透過高度結構化的排障思維，將 MTTR (平均修復時間) 降至最低。
 
