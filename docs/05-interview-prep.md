@@ -1,4 +1,4 @@
-﻿# 🎯 DevOps / 雲端工程師面試攻防教戰手冊
+# 🎯 DevOps / 雲端工程師面試攻防教戰手冊
 
 本文件提煉了專案中各項技術決策與企業職缺 (JD) 要求的對應關係，並收錄了常見的架構設計考題與自我反思。這是一份專為面試高階 Kubernetes / DevOps 職位打造的戰略手冊。
 
@@ -40,9 +40,9 @@
 「這取決於應用的 IOPS 需求與存取模式。對於資料庫 (如本專案的場景)，它需要極高的寫入效能與極低的延遲，且通常是單一 Pod 獨佔讀寫。因此我選擇了提供 ReadWriteOnce (RWO) 特性且 IOPS 穩定的 EBS。
 如果今天是多個 Pod 需要同時讀寫同一份圖片庫，我就會選擇支援 ReadWriteMany (RWX) 的 EFS，即使它的延遲相對高一點。架構設計就是一場權衡 (Trade-off) 的藝術。」
 
-### Q3：如果在 	erraform apply 到一半網路斷線了怎麼辦？
+### Q3：如果在 `terraform apply` 到一半網路斷線了怎麼辦？
 **回答策略**：(展現對狀態鎖定的了解)
-「Terraform 在執行變更時，會利用 Backend (如 S3) 搭配 DynamoDB 進行狀態鎖定 (State Lock)。如果網路突然斷線，鎖定可能不會自動解除。我會先登入 AWS 確認實際資源建立到哪個階段，確認沒有其他同事在執行後，手動透過 	erraform force-unlock 解除鎖定，然後重新執行 	erraform plan 讓它接續完成剩下的工作。」
+「Terraform 在執行變更時，會利用 Backend (如 S3) 搭配 DynamoDB 進行狀態鎖定 (State Lock)。如果網路突然斷線，鎖定可能不會自動解除。我會先登入 AWS 確認實際資源建立到哪個階段，確認沒有其他同事在執行後，手動透過 `terraform force-unlock` 解除鎖定，然後重新執行 `terraform plan` 讓它接續完成剩下的工作。」
 
 ---
 
