@@ -547,15 +547,11 @@ HIGH: ...
 **展示內容**：展示透過 GitOps 一鍵部署企業級監控堆疊 (Kube-Prometheus-Stack)。
 
 > [!IMPORTANT]
-> **【關鍵等待：給 Argo CD 一點時間】**
-> 當您執行完 `kubectl apply -f k8s/09-observability.yaml` 後，Argo CD 需要約 **30-60 秒** 才能下載完設定並建立 `monitoring` 命名空間。
-> **如果您立刻執行步驟 1 的 port-forward 會報錯 `NotFound`。** 請先喝口水，等一分鐘後再繼續。
-> 
-> **檢查方法**：執行 `kubectl get ns` 看到 `monitoring` 出現後再開始。
-
-> [!TIP]
-> **前置準備**：
-> 確保已透過 `kubectl apply -f k8s/09-observability.yaml` 部署設定，並等待 Argo CD 完成同步 (Sync)。由於包含多個 CRD 與元件，初次啟動約需 2-3 分鐘。
+> **【關鍵等待：Argo CD 與 CRD 同步】**
+> 1. **執行部署**：`kubectl apply -f k8s/09-observability.yaml`
+> 2. **等待機制**：Argo CD 需要約 **2-3 分鐘** 來下載組件並同步多個 CRD (如 PrometheusRule, ServiceMonitor)。
+> 3. **檢查方法**：執行 `kubectl get ns` 看到 `monitoring` 出現且 Pod 狀態為 `Running` 後再開始。
+> **※ 提醒**：若未等待完成即執行 `port-forward`，會導致 `NotFound` 報錯。請先喝口水稍候片刻。
 
 1.  **登入 Grafana 視覺化介面**：
     *   **指令 (開啟對外連線)**：
