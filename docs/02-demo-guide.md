@@ -16,7 +16,7 @@
 
 > [!CAUTION]
 > **【警告：所有情境的共同前提】**
-> 無論您今天要展示場景一還是場景九，**底下的 0.1 到 0.3 步驟絕對不能跳過！**
+> 無論您今天要展示場景一還是場景九 (⚠️ 目前未完成實作)，**底下的 0.1 到 0.3 步驟絕對不能跳過！**
 > 如果您剛跑完 `terraform apply` 重建叢集，您的叢集是完全空白的。跳過這些步驟會導致：
 > 1. `kubectl` 報錯 `no such host` (未更新憑證)。
 > 2. 部署 K8s YAML 時報錯 `no matches for kind` (未安裝 Argo CD 或 Kyverno 的 CRD)。
@@ -306,71 +306,66 @@
 > [!TIP]
 > **💡 演示小撇步 (Pro-tips)：**
 > 1. **看到「紅燈 (Red X)」不要慌**：如果您的 `Terraform CI/CD` 顯示失敗，這反而是展示 **「自動化攔截 (Security Gatekeeping)」** 的最佳機會。您可以跟面試官說：「這代表我的 Pipeline 成功抓到了不符合規範的代碼（例如 S3 未加密），並在進入生產環境前將其擋下。」
-> 2. **展示重點**：點開失敗的 Job，找出 `Checkov` 掃描結果，展示那些失敗的 `FAILED` 項目，這比單純看綠燈更能展現 DevSecOps 的價值。
+> 2. **展示重點**：點開失敗的 Job，找出 `Checkov` 掃描結果，展示那些失敗的 `FAILED` 項目，這比單純看綠燈更能展現 DevSecOps 的價�## 🎭 場景九：可觀測性與監控 (Observability / Grafana)
+**📂 涉及檔案**：`k8s/09-observability.yaml`
+**展示內容**：展示如何透過 GitOps 實現「監控即代碼 (Observability as Code)」，並利用 SRE 黃金訊號進行叢集治理。
+
+### 📂 1. 場景涉及檔案與技術角色
+| 檔案路徑 | 角色定位 | 功能詳解 (做了什麼？) |
+| :--- | :--- | :--- |
+| **`k8s/09-observability.yaml`** | **配置源頭 (GitOps)** | **Argo CD Application**。定義了 `kube-prometheus-stack` 的 Helm 部署參數。 |
+| **`monitoring` Namespace** | **監控領地** | 所有監控組件 (Prometheus, Grafana, Exporters) 的存放空間。 |
+| **`argocd-server`** | **部署守護者** | 負責監控系統本身的生命週期管理與故障修復。 |
 
 ---
 
-### 🧠 情境背景說明
-
-> **核心概念**：每當有人把程式碼推上 GitHub，GitHub 就會「自動幫你做品質檢查」，不需要人工干預。
->
-> 
->
-> 你的專案設定了兩條自動流水線：
-> - **流水線 1 (`Security Scan`)** → 用 Trivy 工具自動掃描程式碼和 Image 有沒有已知安全漏洞，並吐出報告
-> - **流水線 2 (`Terraform CI/CD`)** → 自動確認 Terraform 格式正確、沒有語法錯誤
+### 🧠 2. 核心架構思維：為什麼要用 Argo CD 裝監控？
+*   📢 **解說詞**：「場景九我們實踐的是 **『監控即代碼 (Observability as Code)』**。我們不手動執行 Helm 指令，而是將監控系統的規格定義在 Git 中，交由 Argo CD 進行管理。這確保了當叢集規模擴展或重建時，監控系統能自動以完全一致的規格被復原，消除了手動安裝的不確定性。」
 
 ---
 
-### 👆 Step 1：打開 GitHub Actions 頁面
+### 🛠️ 3. 部署與實戰故障排除 (Troubleshooting)
 
-**操作**：打開瀏覽器 → 進你的 GitHub 專案 → 點上方 「Actions」 頁籤
+#### Step 1：執行 GitOps 部署
+*   **指令**：`kubectl apply -f k8s/09-observability.yaml`
 
-**你會看到**：所有自動跑過的流水線列表
+> [!CAUTION]
+> **🚨 SRE 實戰經驗：處理巨大的 CRD (Server Side Apply)**
+> **現象**：若 Argo CD 顯示 `Sync failed` 且報錯 `Too long: must have at most 262144 characters`。
+> **原因**：Prometheus Stack 的定義檔極其龐大，超出了 K8s 預設的 64KB 註解限制。
+> **解決方案**：
+> 1. 登入 Argo CD -> 點進 `prometheus-stack` -> `APP DETAILS`。
+> 2. `SYNC POLICY` -> `EDIT` -> 勾選 **`Server Side Apply`** 並儲存。
+> 3. 再次點擊 **`SYNC`**，即可順利綠燈。這展現了處理大規模 K8s 設定檔的專業經驗。
 
-**說明**：
-> 「你可以看到，這裡是 GitHub Actions 的流水線紀錄。每一次我 push 程式碼到 GitHub，這些流水線就會自動觸發，完全不需要人工干預。」
-
----
-
-### 👆 Step 2：點進 Security Scan 那一筆
-
-**操作**：點擊列表中的 「Security Scan」 那一行（有 ✅ 的那筆）
-
-**你會看到**：左邊有 `Container Security Scan` 這個 Job
-
-**操作**：點進去，點開 「Run Trivy vulnerability scanner in IaC mode」 那個步驟
-
-**你會看到**：一大堆掃描輸出，像這樣：
-```
-CRITICAL: ... 
-HIGH: ...
-```
-
-**說明**：
-> 「這是 Trivy 工具在掃描我的 Terraform 基礎設施代碼，找出已知的安全漏洞（CVE）。你可以看到它產出了完整的漏洞清單。」
->
-> 「在 Demo 環境裡我設定的是顯示報告但不中斷流程。但在真實生產環境，我會把它設成發現 HIGH/CRITICAL 漏洞就直接讓 Pipeline 失敗，阻止不安全的程式碼合併進主線。」
+#### Step 2：等待與狀態檢查
+*   **檢查指令**：`kubectl get pods -n monitoring -w`
+*   **目標**：看到 `prometheus-prometheus-stack-...-0` 出現且為 `Running`。
 
 ---
 
-### 👆 Step 3：點進 Terraform CI/CD 那一筆
+### 📊 4. 深度看板解析 (SRE 黃金訊號展示)
 
-**操作**：返回 Actions 列表 → 點擊 「Terraform CI/CD (Multi-Tool Demo)」 那一行
+*   **登入指令**：`kubectl port-forward svc/prometheus-stack-grafana -n monitoring 3000:80`
+*   **帳密**：`admin` / `admin` (或設定好的固定密碼)
 
-**你會看到**：幾個步驟，包括 `Terraform Format Check`、`Run Checkov`、`Terraform Init`
+📢 **解說詞 (專業 Talk Track)**：
+> 「現在我們進入 Grafana 面板。身為 SRE，我們不只是看數據，我們看的是 **『黃金訊號 (Golden Signals)』**。我特別推薦看這三個面板，它們分別代表了叢集的不同維度：」
 
-**操作**：展開 「Run Checkov (Security Scan)」 步驟
-
-**說明**：
-> 「這條流水線用來確保我的基礎設施代碼品質。它會做三件事：第一，格式檢查，確保代碼風格一致；第二，用 Checkov 做靜態安全分析，抓出 Terraform 設定中的資安漏洞；第三，跑 Terraform Plan，預覽這次變更會對雲端資源造成什麼影響，讓工程師在合併前就能確認。」
+1.  **`Kubernetes / Compute Resources / Cluster` (飽和度 Saturation)**：
+    *   **觀察重點**：叢集整體的 CPU/Memory 水位。這決定了我們是否需要擴展 AWS EC2 節點。
+2.  **`Kubernetes / Compute Resources / Namespace (Pods)` (流量 Traffic & 錯誤 Errors)**：
+    *   **觀察重點**：特定應用 (如 Backend) 的資源消耗。這能幫助我們微調 HPA 的觸發閾值，達到成本與穩定性的平衡。
+3.  **`Kubernetes / API server` (延遲 Latency & 健康度)**：
+    *   **觀察重點**：這是 EKS 控制平面的靈魂。如果 API 響應變慢，代表叢集管理層可能面臨壓力，這是進階維運才具備的洞察力。
 
 ---
 
-### 🏆 Step 4：架構價值總結
-
-**架構說明**：
-> 「傳統的維運方式，往往是程式碼上線後才靠人工或事後掃描發現問題，修復成本非常高。我將 Trivy 與 Checkov 這些安全工具整合進 GitHub Actions，讓安全檢查在工程師提交 PR 的當下就自動執行。這就是所謂的『左移資安 (Shift-Left Security)』——把問題攔在最早、最便宜修復的階段。」
+### 🧹 5. 結束展示與清理
+*   **指令**：(Ctrl + C 停止隧道)
+*   **資源回收**：`kubectl delete -f k8s/09-observability.yaml --ignore-not-found`
+*   **說明**：Argo CD 會自動透過 Cascading Delete 清除所有 50+ 個監控組件，保持環境整潔。
+tions，讓安全檢查在工程師提交 PR 的當下就自動執行。這就是所謂的『左移資安 (Shift-Left Security)』——把問題攔在最早、最便宜修復的階段。」
 
 ---
 
@@ -542,19 +537,23 @@ HIGH: ...
 
 
 
-## 🎭 場景九：可觀測性與監控 (Observability / Grafana)
-**📂 涉及檔案**：`k8s/09-observability.yaml`
-**展示內容**：展示透過 GitOps 一鍵部署企業級監控堆疊 (Kube-Prometheus-Stack)。
+## 🎭 場景九：可觀測性與監控 (Observability / Grafana) (⚠️ 未完成實作)
+> [!WARNING]
+> **🚧 實作中 (Under Construction)**
+> 此場景之監控組件與儀表板尚在整合測試中，暫不建議於正式面試演示中使用。
 
 > [!IMPORTANT]
-> **【關鍵等待：Argo CD 與 CRD 同步】**
-> 1. **執行部署**：`kubectl apply -f k8s/09-observability.yaml`
-> 2. **等待機制**：Argo CD 需要約 **2-3 分鐘** 來下載組件並同步多個 CRD (如 PrometheusRule, ServiceMonitor)。
-> 3. **檢查方法**：執行指令觀察 Pod 狀態，直到所有組件顯示 `Running` 且 `READY` 為 `1/1`：
->    ```powershell
->    kubectl get pods -n monitoring -w
->    ```
-> **※ 提醒**：若未等待完成即執行 `port-forward`，會導致 `NotFound` 報錯。請先喝口水稍候片刻。
+> **📢 場景九前置準備：Argo CD 核心檢查 (Demo 順暢關鍵)**
+>
+> **為什麼這裡需要 Argo CD？**
+> 場景九並非手動安裝，而是實踐 **「監控即代碼 (Observability as Code)」**。我們透過 Argo CD 統一管理複雜的 Prometheus Stack，確保監控組件的狀態與 GitHub 完全同步，避免人為設定偏移。
+>
+> **1. 執行部署**：`kubectl apply -f k8s/09-observability.yaml`
+> **2. 故障排除 (必看 ⚠️)**：
+> 由於 Prometheus 的自定義資源 (CRD) 極其龐大，常會超出 K8s 預設的註解限制 (64KB)。若 Argo CD 顯示 `Sync failed`，請務必開啟 **Server Side Apply**：
+> *   進入 Argo CD 介面 -> `prometheus-stack` -> `APP DETAILS` -> `SYNC POLICY` -> 勾選 **`Server Side Apply`** -> 儲存並重新 **`SYNC`**。
+> **3. 等待機制**：同步開始後需約 **2-3 分鐘**，直到 `kubectl get pods -n monitoring` 看到所有組件為 `Running`。
+> **※ 提醒**：若連線斷開，請重新執行 `kubectl port-forward svc/prometheus-stack-grafana -n monitoring 3000:80`。
 
 1.  **登入 Grafana 視覺化介面**：
     *   **指令 (開啟對外連線)**：
@@ -587,6 +586,89 @@ HIGH: ...
         # 刪除 Argo CD Application，Argo CD 會自動把 Prometheus 相關資源全部回收
         kubectl delete -f k8s/09-observability.yaml --ignore-not-found
         ```
+
+
+---
+
+## 🎭 場景十：災難復原實戰 (Disaster Recovery / Velero)
+**📂 涉及檔案**：`bin/dr-demo.ps1` (SRE 模擬腳本), `demo-pods/ebs-test-pod-a.yaml` (測試 Pod)
+**展示內容**：模擬區域級災難導致應用消失，並展示如何透過「IaC + 狀態備份」在數分鐘內復原。此場景完全獨立，包含自動化建置與清掃步驟。
+
+> [!TIP]
+> **📢 SRE 面試金句：**
+> 「在生產環境中，我們追求的不是『永不當機』，而是『極致的平均修復時間 (MTTR)』。這個 Demo 將展示我們如何處理最嚴重的『資源徹底損毀』情境。」
+
+### 1. 🏗️ 前置準備 (Independent Setup)
+為了確保 Demo 環境獨立且乾淨，我們首先建立一個帶有 Persistent Volume (EBS) 的狀態化應用。
+*   **啟動指令**：
+    ```powershell
+    .\bin\dr-demo.ps1 init
+    ```
+*   **精確檢查指令**：
+    ```powershell
+    # 觀察狀態直到變為 Running (約需 30-60 秒，等待 AWS 掛載 EBS)
+    kubectl get pod ebs-test-pod-a -w
+    ```
+
+### 2. 🔥 引發災難 (Disaster Simulation)
+*   **指令**：
+    ```powershell
+    .\bin\dr-demo.ps1 disaster
+    ```
+*   **🔍 [核對清單] 證明災難發生**：
+    ```powershell
+    # 確認 Pod 與 PVC 都已消失 (會顯示 NotFound)
+    kubectl get pod,pvc ebs-test-pod-a ebs-claim
+    ```
+*   📢 **解說詞**：「現在我模擬發生了誤刪或區域性故障。大家可以看到，我們的後端 Pod 與對應的 EBS 磁碟宣告 (PVC) 都已經徹底消失。在傳統環境這可能需要數小時修復。」
+
+### 3. 🚀 執行復原 (Recovery Flow)
+*   **指令**：
+    ```powershell
+    .\bin\dr-demo.ps1 recover
+    ```
+*   **🌐 [專家加碼] 檢查 S3 備份狀態 (模擬 Velero 視角)**：
+    ```powershell
+    # 展示備份物件確實存在於 S3 中 (請替換為您的 Bucket 名稱)
+    aws s3 ls s3://<your-velero-bucket>/velero/backups/
+    ```
+*   📢 **解說詞**：「現在我啟動 SRE 復原程序。系統會自動執行三個步驟：首先由 Terraform 確保基礎設施對齊，接著由 **Velero** 從 AWS S3 拉回最近一次的 EBS 快照。最後，Argo CD 會自動補足剩餘的 K8s 物件。大家可以看到，應用已重新回到 Running 狀態，且資料完整無缺。」
+
+### 4. 🧹 場景清理 (Post-Demo Cleanup)
+展示結束後，請務必清理資源以維持叢集整潔，並避免 EBS 持續扣款。
+*   **指令**：
+    ```powershell
+    .\bin\dr-demo.ps1 clean
+    ```
+
+### 🧠 SRE 深度技術解析 (RTO/RPO)
+*   📢 **深度解說**：「這個流程體現了我們的 **RPO (復原點目標) 趨近於 0**，因為我們利用了 AWS EBS 的快照機制；同時 **RTO (復原時間目標)** 僅需數分鐘，這歸功於我們將所有配置都 **代碼化 (IaC)** 與 **GitOps 化** 的設計成果。」
+
+---
+
+### 🔍 SRE 實戰診斷：當 Pod 卡在 Pending 時 (Troubleshooting)
+如果在執行 `init` 後 Pod 長時間停留在 `Pending`，請執行 `kubectl describe pod ebs-test-pod-a`，您可能會學到以下經典 SRE 案例：
+
+1.  **Too many pods (資源飽和)**：
+    *   **現象**：顯示 `0/4 nodes are available: 3 Too many pods`。
+    *   **原因**：EKS 小型節點有 Pod 數量上限（受限於 ENI IP 數量）。
+    *   **對策**：這正是展示「資源管理」的好機會。您可以說：「因為測試環境資源有限，我現在手動清理不必要的 Demo 資源，這體現了 SRE 對叢集容量 (Capacity) 的掌控。」
+2.  **Argo CD 資源爭奪戰 (Self-Healing Competition)**：
+    *   **現象**：剛刪掉其他 Pod，空間又立刻被 `ecommerce-backend` 搶走。
+    *   **原因**：Argo CD 偵測到狀態不一致，自動修復 (Self-Heal) 了被刪除的應用。
+    *   **解決**：暫時刪除 Argo CD Application (`kubectl delete -f k8s/08-argo-application.yaml`)，確保 DR 場景有最高優先權。
+3.  **PVC Not Found (復原順序問題)**：
+    *   **現象**：Pod 報錯 `persistentvolumeclaim "ebs-claim" not found`。
+    *   **原因**：復原時 Pod 比 PVC 先建立，導致 Scheduler 找不到磁碟。
+    *   **對策**：修正腳本執行順序，採用「數據優先 (Data-First)」策略。這展現了對 K8s 資源依賴鏈 (Dependency Chain) 的理解。
+4.  **Volume Node Affinity Conflict (區域衝突)**：
+    *   **原因**：EBS 硬碟屬於「單一可用區 (AZ)」資源。如果 Pod 被調度到不含該硬碟的 AZ，就會發生衝突。
+    *   **解決**：刪除 Pod 讓 Scheduler 重新嘗試，或確保節點橫跨多個 AZ。
+
+### 💡 讓 Demo 更專業的 3 個建議 (Smooth Demo Tips)
+*   **建議 1：預熱環境**：面試開始前 5 分鐘先跑一次 `.\bin\dr-demo.ps1 init`。這能確保 EBS 磁碟已經掛載好，Demo 時 `recover` 會快得多。
+*   **建議 2：暫停 GitOps**：在做 DR Demo 時，建議先暫停或移除 Argo CD 的 Application，避免背景的自動修復干擾您的演示流程。
+*   **建議 3：話術填補**：在等待磁碟掛載的 30 秒空檔，不要沉默。可以用來介紹：「現在 AWS 正在後台將實體 EBS 快照掛載到 EC2 執行個體，這個過程在傳統虛擬化環境可能需要數倍的時間...」
 
 ---
 

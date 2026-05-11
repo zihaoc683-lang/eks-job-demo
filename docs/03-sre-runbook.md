@@ -101,6 +101,13 @@ kubectl apply --server-side -f <URL_OR_FILE>
 *   所有的微服務應用程式配置皆存放於 GitHub，Argo CD 作為單一真相守護者。
 *   當新叢集建立完成並安裝 Argo CD 後，它將自動掃描 GitHub，並在數分鐘內將數百個微服務「自動部署並配置到位」，達成極致的自動化災難復原。
 
+### 4. 快速演示指南 (Quick DR Demo Guide)
+若需在面試中快速展示 DR 實力，請遵循以下邏輯：
+1. **展示現狀**：部署 Pod (`.\bin\dr-demo.ps1 init`) 並用 `kubectl get pod ebs-test-pod-a -w` 觀察其 Ready。
+2. **模擬毀滅**：執行 `.\bin\dr-demo.ps1 disaster`。強調「連 PVC 都不見了，代表雲端連結已斷開」。
+3. **執行復原**：執行 `.\bin\dr-demo.ps1 recover`。解釋這是模擬 Velero 從 S3 回填快照的過程。
+4. **核心論點**：強調 **RTO (15-20m)** 與 **RPO (<1m)** 的技術支撐點。
+
 ---
 
 ## 🧰 SRE 專業偵錯工具箱 (The Tooling)

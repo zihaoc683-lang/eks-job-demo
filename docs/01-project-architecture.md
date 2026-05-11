@@ -37,7 +37,7 @@
 | **基礎設施層** | [eks.tf](eks.tf) — `cluster_addons` | 啟用 `aws-ebs-csi-driver` 並透過 `ebs_csi_irsa_role` 配置 IRSA 授權。 |
 | **應用定義層** | [k8s/01-storage.yaml](k8s/01-storage.yaml) | 定義 `StorageClass`，指定 `provisioner: ebs.csi.aws.com` + `WaitForFirstConsumer`。 |
 
-### 4. 可觀測性與監控 (Observability)
+### 4. 可觀測性與監控 (Observability) (🚧 實作中)
 
 | 能力 | 說明 | 實踐位置 |
 | :--- | :--- | :--- |
