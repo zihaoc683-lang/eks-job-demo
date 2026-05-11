@@ -550,7 +550,10 @@ HIGH: ...
 > **【關鍵等待：Argo CD 與 CRD 同步】**
 > 1. **執行部署**：`kubectl apply -f k8s/09-observability.yaml`
 > 2. **等待機制**：Argo CD 需要約 **2-3 分鐘** 來下載組件並同步多個 CRD (如 PrometheusRule, ServiceMonitor)。
-> 3. **檢查方法**：執行 `kubectl get ns` 看到 `monitoring` 出現且 Pod 狀態為 `Running` 後再開始。
+> 3. **檢查方法**：執行指令觀察 Pod 狀態，直到所有組件顯示 `Running` 且 `READY` 為 `1/1`：
+>    ```powershell
+>    kubectl get pods -n monitoring -w
+>    ```
 > **※ 提醒**：若未等待完成即執行 `port-forward`，會導致 `NotFound` 報錯。請先喝口水稍候片刻。
 
 1.  **登入 Grafana 視覺化介面**：
