@@ -13,14 +13,14 @@ kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply 
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 
 Write-Host "3. Installing Kyverno..." -ForegroundColor Yellow
-kubectl apply --server-side -f https://github.com/kyverno/kyverno/releases/latest/download/install.yaml
+kubectl apply --server-side --force-conflicts -f https://github.com/kyverno/kyverno/releases/latest/download/install.yaml
 
 Write-Host "4. Installing Trivy Operator..." -ForegroundColor Yellow
-kubectl apply -f https://raw.githubusercontent.com/aquasecurity/trivy-operator/main/deploy/static/trivy-operator.yaml
+kubectl apply --server-side --force-conflicts -f https://raw.githubusercontent.com/aquasecurity/trivy-operator/main/deploy/static/trivy-operator.yaml
 
 Write-Host "5. Installing Argo CD..." -ForegroundColor Yellow
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 Write-Host "5. Deploying EBS Storage..." -ForegroundColor Yellow
 kubectl apply -f k8s/01-storage.yaml

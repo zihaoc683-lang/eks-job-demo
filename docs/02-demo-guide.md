@@ -240,6 +240,11 @@
 ## 🎭 場景五：資安漏洞自動掃描 (Trivy Operator)
 **📂 涉及檔案**：(平台組件，由 Bootstrap 腳本安裝)
 
+> [!TIP]
+> **💡 演示小撇步 (Pro-tips)：**
+> 1. **耐心等待掃描完成**：Trivy Operator 在剛安裝完後的 1-3 分鐘內可能還在啟動掃描任務，此時執行指令可能會看到 `No resources found`。若遇到此情況，請跟面試官解釋「掃描器正在進行初次全盤掃描」，稍等片刻即可。
+> 2. **關於 `monitoring` 命名空間**：如果您尚未部署 Prometheus 等監控組件，`-n monitoring` 會顯示查無資源。這正是「有 Pod 才有掃描」的精確表現，也證明了報告是即時且真實的。
+
 ### 💡 運作原理 (Working Principle)
 *   **事件驅動 (Event-driven)**：Trivy Operator 監聽 K8s API，一旦有新 Pod 生成，立即觸發掃描任務 (Scan Job)。
 *   **資源化報告**：掃描結果直接轉化為 K8s 的 **Custom Resource (CRD)**，讓 SRE 能用原生指令 `kubectl get vulnerabilityreports` 進行審計。
