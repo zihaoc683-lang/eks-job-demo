@@ -356,9 +356,7 @@ HIGH: ...
 > 在執行部署前，我們可以看到專案中使用了 `k8s/base/` (公版) 與 `k8s/overlays/production/` (客製化覆蓋版)。
 > 傳統部署中，不同環境 (Dev, Prod) 往往需要複製多份 YAML，導致維護困難。透過 Kustomize，我們將共通設定放在 `base`，並在 `overlays` 針對特定環境打上 Patch (例如提高正式機的副本數)。這樣確保了基礎架構的「唯一真相」，大幅提升設定檔的重用性並降低維護風險。Argo CD 將會直接拉取 `production` 的設定進行部署。
 
-> [!IMPORTANT]
-> **【關鍵等待：給 Argo CD 一點時間】**
-> 當您執行完 `kubectl apply -f k8s/08-argo-application.yaml` 後，請等待約 **30 秒** 讓 Argo CD 抓取 Git 資源並建立對應的 Pod，再進行後續展示。
+
 
 > [!TIP]
 > **前置準備 (大掃除與安裝)**：
@@ -370,7 +368,7 @@ HIGH: ...
 >    kubectl delete rollout ecommerce-backend --ignore-not-found
 >    kubectl delete svc ecommerce-svc --ignore-not-found
 >    ```
-> 3. **【綁定 GitOps】** 接著執行：`kubectl apply -f k8s/08-argo-application.yaml` 將本專案交給 Argo CD 管理。
+> 3. **【綁定 GitOps】** 接著執行：`kubectl apply -f k8s/08-argo-application.yaml` (執行後請等待約 30 秒讓 Argo CD 完成同步)。
 
 1.  **登入 Argo CD 視覺化介面**：
 
