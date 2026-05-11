@@ -292,7 +292,10 @@
 ---
 
 ## 🎭 場景六：DevSecOps CI 管道 (GitHub Actions)
-**📂 涉及檔案**：`.github/workflows/security-scan.yml`, `.github/workflows/terraform-ci.yml`
+**📂 涉及檔案**：
+*   `.github/workflows/security-scan.yml`：**安全守門員**。運行 Trivy 進行 Container Image 與 IaC 漏洞掃描。
+*   `.github/workflows/terraform-ci.yml`：**合規自動化**。整合 Checkov 靜態分析與 Terraform Plan 預覽。
+*   `*.tf` & `k8s/*.yaml`：**被動審計對象**。代表「Infrastructure as Code」，是所有安全規則的實踐主體。
 **展示內容**：展示「左移資安 (Shift-Left)」，不用敲任何 K8s 指令，純展示瀏覽器畫面。
 
 > [!TIP]
