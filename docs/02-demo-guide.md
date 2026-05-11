@@ -147,6 +147,14 @@
     *   **指令**：`.\bin\kubectl-argo-rollouts.exe promote ecommerce-backend`
     *   **意義**：確認無誤後，信心滿滿地將新版本推向 100%。
 
+6.  **🧹 收尾清理**：
+    *   **指令**：
+        ```powershell
+        kubectl delete rollout ecommerce-backend --ignore-not-found
+        kubectl delete svc ecommerce-svc --ignore-not-found
+        ```
+    *   **意義**：清除 Canary 部署資源，避免影響下一個場景的展示。
+
 ---
 
 ## 🎭 場景三：政策治理 (Governance / Kyverno) - P0 核心
