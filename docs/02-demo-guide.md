@@ -93,7 +93,7 @@
         kubectl get pods -l app=ecommerce-backend -w
         ```
 
-    *   **🛑 停止壓測與清理**：
+    *   **🛑 收尾清理**：
         ```powershell
         # 1. 在壓測視窗按下 Ctrl + C 停止指令
         # 2. 為確保資源釋放，執行清理指令：
@@ -211,6 +211,14 @@
     4. **拒絕入境**：Kyverno 看到違規，回傳 **"Forbidden!"**，Pod 完全不會被建立。
 5.  📢 架構介紹：這就是 Policy as Code。我們將資安準則直接寫入 K8s API 核心，從根源杜絕不安全的容器進入叢集。
 
+6.  **🧹 收尾清理**：
+    *   **指令**：
+        ```powershell
+        # 若要重複演示，建議移除政策以重新展示「安裝過程」
+        kubectl delete clusterpolicy disallow-privileged-containers --ignore-not-found
+        ```
+    *   **意義**：維持環境獨立性。
+
 ---
 
 ## 🎭 場景四：雲端存儲持久化 (EBS Storage)
@@ -277,6 +285,9 @@
 
 4.  **🔍 進階技術說明（DevSecOps 藍圖）**：
     > 「在真實生產環境中，我會將 Trivy 與 **Kyverno** 聯動。如果掃描報告顯示包含 Critical 等級的漏洞，政策引擎會自動禁止該 Pod 的執行，實現自動化的安全治理閉環。」
+
+6.  **🧹 收尾清理**：
+    *   **說明**：Trivy Operator 為背景監控組件，展示完畢後**無須手動清理**，不影響其他場景運作。
 
 ---
 
@@ -433,7 +444,7 @@ HIGH: ...
     *   📢 **架構設計亮點三：自我修復機制 (Self-Healing)**
         「在剛才的展示中，我手動刪除了 Service。Argo CD 在對帳時立刻發現：『咦？Git 上明明寫著要有這個 Service，為什麼 K8s 裡面沒有？這產生了**配置偏移 (Configuration Drift)**！』。因為我們在 Application 設定中開啟了 `selfHeal: true`，Argo CD 就會毫不猶豫地把遺失的資源重新 apply 回去。這徹底杜絕了工程師圖方便『手動改線上機器卻不改 Code』的壞習慣，確保基礎設施始終與 Git 保持一致。」
 
-4.  **🧹 場景收尾：停止 Port Forward**：
+4.  **🧹 收尾清理**：
     ```powershell
     # 在執行 port-forward 的終端機視窗按下 Ctrl + C 即可停止
     # 若找不到該視窗，用以下指令強制釋放 9090 port：
