@@ -384,7 +384,9 @@ HIGH: ...
         ```powershell
         kubectl port-forward svc/argocd-server -n argocd 9090:443
         ```
-        > ⚠️ `8080` 被 Windows 系統保留封鎖，固定改用 `9090`。
+        > 💡 **為什麼用 9090 而不是 8080？**
+        > *   **對外存取 (9090)**：Windows 系統常會佔用 `8080`，因此我們將本地端對應改為 `9090` 以確保 Demo 順利。
+        > *   **對內指令 (8080)**：下方的「密碼重設」腳本使用的是 `kubectl exec` 進入 Pod 內部，而在 Pod 內部 Argo CD 預設就是監聽 `8080`。這兩者分別處於「外部隧道」與「內部環境」，因此埠號不同是正常的。
     *   **操作**：打開瀏覽器前往 `https://localhost:9090`，忽略憑證警告，帳號 `admin`，密碼 `ArgoDemo2026!`。展示畫面上綠色打勾的 `ecommerce-app`。
 
     <details>
