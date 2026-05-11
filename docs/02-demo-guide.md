@@ -476,7 +476,7 @@ HIGH: ...
 > > [!CAUTION]
 > > **🚨 排除故障：如果出現「Admission Webhook Denied」報錯？**
 > > 如果您剛執行完 **場景三 (Kyverno)** 且未清理政策，建立重置容器時會被攔截。這證明了安全政策正在生效！
-> > **解決方案**：執行 `kubectl delete clusterpolicy disallow-privileged-containers` 移除禁令後再繼續。
+> > **解決方案**：執行 `kubectl delete clusterpolicy disallow-privileged-containers --ignore-not-found` 移除禁令後再繼續。
 
 ### 📂 場景涉及檔案與技術角色
 | 檔案路徑 | 角色定位 | 功能詳解 (做了什麼？) |
