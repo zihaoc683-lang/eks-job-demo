@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS EKS 生產級平台工程實踐 | Wei Han Chen</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111827;
+    --bg3: #1a2235;
+    --border: rgba(99, 179, 237, 0.15);
+    --border2: rgba(99, 179, 237, 0.3);
+    --accent: #63b3ed;
+    --accent2: #48bb78;
+    --accent3: #f6ad55;
+    --accent4: #fc8181;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Sora', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    padding: 80px 40px 60px;
+    max-width: 960px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -120px; right: -120px;
+    width: 480px; height: 480px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,179,237,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    margin-bottom: 24px;
+    letter-spacing: 0.05em;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .hero h1 span { color: var(--accent); }
+
+  .hero .sub {
+    font-size: 15px;
+    color: var(--text2);
+    margin-bottom: 32px;
+    max-width: 600px;
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid;
+  }
+
+  .tag-blue { color: var(--accent); border-color: rgba(99,179,237,0.3); background: rgba(99,179,237,0.05); }
+  .tag-green { color: var(--accent2); border-color: rgba(72,187,120,0.3); background: rgba(72,187,120,0.05); }
+  .tag-amber { color: var(--accent3); border-color: rgba(246,173,85,0.3); background: rgba(246,173,85,0.05); }
+  .tag-red { color: var(--accent4); border-color: rgba(252,129,129,0.3); background: rgba(252,129,129,0.05); }
+
+  .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0e1a;
+  }
+
+  .btn-primary:hover { background: #90cdf4; transform: translateY(-1px); }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border2);
+  }
+
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+  /* ── SECTION ── */
+  .section {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 40px 60px;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    letter-spacing: -0.01em;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    max-width: 960px;
+    margin: 0 auto 60px;
+  }
+
+  /* ── SRE METRICS ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  @media (max-width: 600px) { .metrics-grid { grid-template-columns: 1fr; } }
+
+  .metric-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .metric-card.rto::before { background: var(--accent); }
+  .metric-card.rpo::before { background: var(--accent2); }
+  .metric-card.mttr::before { background: var(--accent3); }
+
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .metric-card.rto .metric-value { color: var(--accent); }
+  .metric-card.rpo .metric-value { color: var(--accent2); }
+  .metric-card.mttr .metric-value { color: var(--accent3); }
+
+  .metric-desc { font-size: 12px; color: var(--text2); }
+
+  /* ── RESOURCES ── */
+  .resources-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 600px) { .resources-grid { grid-template-columns: 1fr; } }
+
+  .resource-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+  }
+
+  .resource-card:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+    transform: translateY(-2px);
+  }
+
+  .resource-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .resource-icon.github { background: rgba(99,179,237,0.1); color: var(--accent); }
+  .resource-icon.arch { background: rgba(72,187,120,0.1); color: var(--accent2); }
+  .resource-icon.sre { background: rgba(252,129,129,0.1); color: var(--accent4); }
+  .resource-icon.cost { background: rgba(246,173,85,0.1); color: var(--accent3); }
+
+  .resource-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .resource-desc { font-size: 12px; color: var(--text2); }
+
+  /* ── SCENARIOS ── */
+  .scenario-group { margin-bottom: 32px; }
+
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .group-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .group-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--text2);
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  .scenarios-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .scenario-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .scenario-item:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+
+  .scenario-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: 2px;
+    width: 48px;
+  }
+
+  .scenario-content { flex: 1; }
+
+  .scenario-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .scenario-desc { font-size: 12px; color: var(--text2); }
+
+  .scenario-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    align-self: flex-start;
+  }
+
+  .badge-blue { background: rgba(99,179,237,0.1); color: var(--accent); }
+  .badge-green { background: rgba(72,187,120,0.1); color: var(--accent2); }
+  .badge-red { background: rgba(252,129,129,0.1); color: var(--accent4); }
+  .badge-amber { background: rgba(246,173,85,0.1); color: var(--accent3); }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 40px;
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-name { font-weight: 600; font-size: 14px; }
+  .footer-sub { font-size: 12px; color: var(--text2); }
+  .footer-contact { font-size: 13px; color: var(--text2); font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="badge">Production-Grade Platform Engineering</div>
+  <h1>AWS EKS <span>生產級</span><br>平台工程實踐</h1>
+  <p class="sub">整合 IaC、GitOps、DevSecOps 與 SRE 之端對端解決方案<br>模擬企業級金融／電商生產環境需求</p>
+  <div class="tag-row">
+    <span class="tag tag-blue">Terraform</span>
+    <span class="tag tag-blue">AWS EKS</span>
+    <span class="tag tag-green">Argo CD</span>
+    <span class="tag tag-green">GitOps</span>
+    <span class="tag tag-red">DevSecOps</span>
+    <span class="tag tag-red">Kyverno</span>
+    <span class="tag tag-amber">Velero DR</span>
+    <span class="tag tag-amber">SRE</span>
+  </div>
+  <div class="cta-row">
+    <a href="https://github.com/zihaoc683-lang/eks-job-demo" target="_blank" class="btn btn-primary">
+      ⬡ GitHub Repository
+    </a>
+    <a href="#scenarios" class="btn btn-outline">
+      ▶ 場景演示影片
+    </a>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SRE METRICS -->
+<section class="section">
+  <p class="section-label">SRE 服務等級指標</p>
+  <h2 class="section-title">生產級可用性設計目標</h2>
+  <div class="metrics-grid">
+    <div class="metric-card rto">
+      <p class="metric-label">RTO — 復原時間目標</p>
+      <p class="metric-value">15–20<span style="font-size:16px;font-weight:400"> 分鐘</span></p>
+      <p class="metric-desc">Terraform 基礎設施重建 (12m) + Bootstrap 平台引導 (3m)</p>
+    </div>
+    <div class="metric-card rpo">
+      <p class="metric-label">RPO — 數據丟失目標</p>
+      <p class="metric-value">&lt; 1<span style="font-size:16px;font-weight:400"> 分鐘</span></p>
+      <p class="metric-desc">Velero EBS Snapshot 持久化 + GitOps 唯一真相來源</p>
+    </div>
+    <div class="metric-card mttr">
+      <p class="metric-label">MTTR — 平均修復時間</p>
+      <p class="metric-value">30s–5<span style="font-size:16px;font-weight:400"> 分鐘</span></p>
+      <p class="metric-desc">K8s Pod 自癒 (30s) + Argo CD 自動偏移修復 (3m)</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- RESOURCES -->
+<section class="section">
+  <p class="section-label">核心資源</p>
+  <h2 class="section-title">架構文件與源碼</h2>
+  <div class="resources-grid">
+    <a href="https://github.com/zihaoc683-lang/eks-job-demo" target="_blank" class="resource-card">
+      <div class="resource-icon github">⬡</div>
+      <div>
+        <p class="resource-name">GitHub 原始碼</p>
+        <p class="resource-desc">eks-job-demo Repository</p>
+      </div>
+    </a>
+    <a href="https://github.com/zihaoc683-lang/eks-job-demo/blob/main/docs/01-project-architecture.md" target="_blank" class="resource-card">
+      <div class="resource-icon arch">▦</div>
+      <div>
+        <p class="resource-name">架構設計決策</p>
+        <p class="resource-desc">專案架構文件 / IaC 設計取捨分析</p>
+      </div>
+    </a>
+    <a href="https://github.com/zihaoc683-lang/eks-job-demo/blob/main/docs/03-sre-runbook.md" target="_blank" class="resource-card">
+      <div class="resource-icon sre">⚑</div>
+      <div>
+        <p class="resource-name">SRE 排障手冊</p>
+        <p class="resource-desc">排障 SOP 與災難復原策略</p>
+      </div>
+    </a>
+    <a href="https://github.com/zihaoc683-lang/eks-job-demo/blob/main/docs/04-cost-analysis.md" target="_blank" class="resource-card">
+      <div class="resource-icon cost">◈</div>
+      <div>
+        <p class="resource-name">雲端成本分析</p>
+        <p class="resource-desc">FinOps：雲端成本分析報告</p>
+      </div>
+    </a>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SCENARIOS -->
+<section class="section" id="scenarios">
+  <p class="section-label">技術實戰演示</p>
+  <h2 class="section-title">場景影片 · 點擊觀看</h2>
+  <div style="margin-bottom:24px;">
+    <a href="https://drive.google.com/drive/folders/1LcE1LW0Q8PqfoViJXBgZ8D26_9zEi-Q7?usp=drive_link" target="_blank" class="btn btn-outline" style="font-size:13px;">
+      ▶ 全場景影片清單
+    </a>
+  </div>
+
+  <!-- Group A -->
+  <div class="scenario-group">
+    <div class="group-header">
+      <div class="group-dot" style="background: var(--accent);"></div>
+      <p class="group-title">A. 自動化維運與穩定性 (Stability)</p>
+    </div>
+    <div class="scenarios-list">
+      <a href="https://drive.google.com/file/d/1a_YSJUJ_1hL6RNVOhZIcGoknprMKO9GB/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 01</span>
+        <div class="scenario-content">
+          <p class="scenario-title">自動化自癒 (Self-healing)</p>
+          <p class="scenario-desc">K8s Pod 自癒機制實作，30 秒內自動重建異常容器</p>
+        </div>
+        <span class="scenario-badge badge-blue">▶ 影片</span>
+      </a>
+      <a href="https://drive.google.com/file/d/19cKYMdQNGDEJB-COPRE2WmqnuZ4d-YOL/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 02</span>
+        <div class="scenario-content">
+          <p class="scenario-title">HPA 水平自動擴縮</p>
+          <p class="scenario-desc">HPA 觸發後 60 秒內完成 Pod 自動擴充，因應爆發流量</p>
+        </div>
+        <span class="scenario-badge badge-blue">▶ 影片</span>
+      </a>
+      <a href="https://drive.google.com/file/d/18u6bF04keqmjBfeoEc8qxwaOXB4brvNH/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 03</span>
+        <div class="scenario-content">
+          <p class="scenario-title">金絲雀發布與漸進式交付 (Canary Rollout)</p>
+          <p class="scenario-desc">Argo Rollouts Canary 部署，秒級回滾，控制爆炸半徑</p>
+        </div>
+        <span class="scenario-badge badge-blue">▶ 影片</span>
+      </a>
+      <a href="https://drive.google.com/file/d/1tC4NadKUqIfKbeA4qQxq0XgzCiaBuWiz/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 07</span>
+        <div class="scenario-content">
+          <p class="scenario-title">GitOps 持續交付與配置偏移自動修復</p>
+          <p class="scenario-desc">Git 為單一真相來源，Argo CD Self-healing 自動修復線上配置偏移</p>
+        </div>
+        <span class="scenario-badge badge-blue">▶ 影片</span>
+      </a>
+      <a href="https://drive.google.com/file/d/1klvFSWdn1ZAfYFBkNxUw90nGGVPlb66k/view?usp=drive_link" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 10</span>
+        <div class="scenario-content">
+          <p class="scenario-title">Velero 災難復原與備份實戰</p>
+          <p class="scenario-desc">定義 RPO/RTO，EBS 區塊級備份，驗證區域級災難下的數據復原能力</p>
+        </div>
+        <span class="scenario-badge badge-amber">▶ 影片</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Group B -->
+  <div class="scenario-group">
+    <div class="group-header">
+      <div class="group-dot" style="background: var(--accent4);"></div>
+      <p class="group-title">B. DevSecOps 與資安治理 (Security)</p>
+    </div>
+    <div class="scenarios-list">
+      <a href="https://drive.google.com/file/d/1wkwDmTqBMpTOHquTEyOgofU64LjOxbVb/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 04</span>
+        <div class="scenario-content">
+          <p class="scenario-title">Kyverno 政策治理與准入控制</p>
+          <p class="scenario-desc">Admission Controller 攔截特權容器與非授權映像檔</p>
+        </div>
+        <span class="scenario-badge badge-red">▶ 影片</span>
+      </a>
+      <a href="https://drive.google.com/file/d/1FxARbDaKuusZkASGK9nvEdVB3AFKsfsL/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 06</span>
+        <div class="scenario-content">
+          <p class="scenario-title">DevSecOps CI 管道 (GitHub Actions)</p>
+          <p class="scenario-desc">GitHub Actions 整合 Checkov IaC 靜態分析與映像檔安全檢查</p>
+        </div>
+        <span class="scenario-badge badge-red">▶ 影片</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Group C -->
+  <div class="scenario-group">
+    <div class="group-header">
+      <div class="group-dot" style="background: var(--accent2);"></div>
+      <p class="group-title">C. 基礎設施優化與存儲 (Infrastructure)</p>
+    </div>
+    <div class="scenarios-list">
+      <a href="https://drive.google.com/file/d/1I15hIHXRj9mNtGU5BP-tsfrxvA7tt7bX/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 05</span>
+        <div class="scenario-content">
+          <p class="scenario-title">AWS EBS 雲端存儲持久化</p>
+          <p class="scenario-desc">EBS CSI Driver 數據持久化，解決計算與存儲耦合問題</p>
+        </div>
+        <span class="scenario-badge badge-green">▶ 影片</span>
+      </a>
+      <a href="https://drive.google.com/file/d/1cC1k6Ap0ziiMtjzaZ5k81qo3QTbhFHnW/view" target="_blank" class="scenario-item">
+        <span class="scenario-num">場景 08</span>
+        <div class="scenario-content">
+          <p class="scenario-title">Ansible 節點加固與核心優化</p>
+          <p class="scenario-desc">Linux Kernel 參數 (somaxconn) 優化，提升高併發連線承載力</p>
+        </div>
+        <span class="scenario-badge badge-green">▶ 影片</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Core Values -->
+  <div style="margin-top: 48px;">
+    <p class="section-label">專案核心價值</p>
+    <h2 class="section-title">四大工程能力展現</h2>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+      <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;">
+        <p style="font-size: 12px; font-family: var(--mono); color: var(--accent4); margin-bottom: 6px; letter-spacing: 0.06em;">SECURITY</p>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">安全治理</p>
+        <p style="font-size: 12px; color: var(--text2);">實踐資安左移，整合 IaC 靜態分析與 Container 運行時防禦</p>
+      </div>
+      <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;">
+        <p style="font-size: 12px; font-family: var(--mono); color: var(--accent); margin-bottom: 6px; letter-spacing: 0.06em;">RELIABILITY</p>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">系統穩定</p>
+        <p style="font-size: 12px; color: var(--text2);">Canary Deployment 與 Self-healing 機制極小化變更風險</p>
+      </div>
+      <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;">
+        <p style="font-size: 12px; font-family: var(--mono); color: var(--accent2); margin-bottom: 6px; letter-spacing: 0.06em;">AVAILABILITY</p>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">高可用性</p>
+        <p style="font-size: 12px; color: var(--text2);">跨可用區 Multi-AZ 架構與 Snapshot 快照復原的災難復原方案</p>
+      </div>
+      <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;">
+        <p style="font-size: 12px; font-family: var(--mono); color: var(--accent3); margin-bottom: 6px; letter-spacing: 0.06em;">AUTOMATION</p>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">工程效率</p>
+        <p style="font-size: 12px; color: var(--text2);">從環境建立、OS 調優到應用部署的全流程自動化</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div>
+    <p class="footer-name">陳威翰 · Wei Han Chen</p>
+    <p class="footer-sub">Cloud Infrastructure Engineer · AWS / IaC / DevSecOps · Platform & SRE</p>
+  </div>
+  <p class="footer-contact">zihaoc683@gmail.com</p>
+</footer>
+
+</body>
+</html>
