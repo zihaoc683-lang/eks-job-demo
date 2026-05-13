@@ -1,3 +1,10 @@
+# 04-hpa.yaml
+# =========================================================================
+# 水平自動擴縮 (Horizontal Pod Autoscaler)
+# =========================================================================
+# 監控 CPU 使用率，超過門檻時自動增加 Pod 數量；壓力解除後自動縮回
+# =========================================================================
+
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -15,21 +22,20 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 30  # 門檻調低到 30%，保證壓測一開立馬有反應
-  
+        averageUtilization: 30  # CPU 超過 30% 即觸發擴容，門檻調低確保壓測時有明顯反應
+
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 0 # 壓力一來，不等待，立刻擴容
+      stabilizationWindowSeconds: 0  # 壓力一來立即擴容，不設冷卻等待
       policies:
       - type: Pods
-        value: 4               # 展示效果：一次長出 4 個 Pod，視覺衝擊感更強
-        periodSeconds: 10      # 每 10 秒評估一次
+        value: 4          # 每次最多新增 4 個 Pod，視覺效果明顯
+        periodSeconds: 10
       selectPolicy: Max
-    
+
     scaleDown:
-      # 重要！Demo 必備：壓力一停，30 秒內就開始縮容，方便你展示第二次 Demo
-      stabilizationWindowSeconds: 30 
+      stabilizationWindowSeconds: 30  # 壓力消失後等待 30 秒再縮容，避免頻繁震盪
       policies:
       - type: Percent
-        value: 100             # 縮容時不手軟，直接縮到 targetReplicas
+        value: 100
         periodSeconds: 15

@@ -1,3 +1,11 @@
+# 09-observability.yaml
+# =========================================================================
+# 可觀測性堆疊 (Observability Stack)
+# =========================================================================
+# 透過 Argo CD 以 GitOps 方式管理 Prometheus + Grafana
+# 實現「監控即代碼 (Observability as Code)」
+# =========================================================================
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -8,13 +16,11 @@ spec:
   source:
     repoURL: 'https://prometheus-community.github.io/helm-charts'
     chart: kube-prometheus-stack
-    # 鎖定穩定版本，避免 Demo 時因為 Chart 更新導致非預期錯誤
-    targetRevision: 58.2.1 
+    targetRevision: 58.2.1  # 鎖定版本，避免 Chart 自動更新造成非預期錯誤
     helm:
-      # 設定預設管理員密碼
       parameters:
         - name: grafana.adminPassword
-          value: "admin"
+          value: "admin"      # Demo 用固定密碼，生產環境應改用 Secret
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: monitoring
@@ -23,4 +29,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=true  # monitoring namespace 不存在時自動建立

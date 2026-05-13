@@ -1,8 +1,11 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ebs-test-pod-a # Pod A 負責「寫入」資料，Pod B 負責「驗證」資料仍在
+  name: ebs-test-pod-a
+  labels:
+    app: storage-demo
 spec:
+  # --- 容器定義 (Application Layer) ---
   containers:
   - name: app
     image: alpine
@@ -10,12 +13,16 @@ spec:
     args:
     - "-c"
     - "echo '總營收一千萬' > /data/secret.txt; sleep 3600"
-    # 寫入資料到 /data/secret.txt 後持續存活，供 kubectl exec 驗證用
+    
+    # 磁碟掛載：將儲存資源掛載到容器內的 /data 路徑
     volumeMounts:
     - name: persistent-storage
-      mountPath: /data     # 把 EBS 硬碟掛載到容器內的 /data 路徑
+      mountPath: /data     
+      
+  # --- 儲存資源定義 (Storage Layer) ---
   volumes:
   - name: persistent-storage
+    # 使用 PVC 模式實作「應用程式」與「底層儲存」的解耦
     persistentVolumeClaim:
-      claimName: ebs-claim # 對應 01-storage.yaml 建立的 PVC（EBS 硬碟請求單）
-                           # Pod 被刪除後，EBS 上的資料不會消失，Pod B 仍能讀到
+      # 指向 ebs-claim，由 CSI Driver 自動與 AWS EBS 串接
+      claimName: ebs-claim

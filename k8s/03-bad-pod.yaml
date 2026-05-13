@@ -1,12 +1,16 @@
+# 03-bad-pod.yaml
+# 這個 Pod 刻意違反安全規則，用於展示 Kyverno 的攔截能力
+# 預期結果：kubectl apply 後應被 Kyverno 拒絕，Pod 不會被建立
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: bad-pod-security-violation # 命名刻意加上 violation，清楚標示這是違規示範
+  name: bad-pod-security-violation
 spec:
   containers:
   - name: bad-pod
-    image: alpine          # alpine = 超輕量 Linux 映像，常用於測試指令
-    command: ["sleep", "3600"] # 讓容器持續存活 1 小時，方便觀察
+    image: alpine
+    command: ["sleep", "3600"]
     securityContext:
-      privileged: true     # ⚠️ 違規點！讓容器獲得宿主機 root 權限，極度危險
-                           # Kyverno 的 validate-privileged 規則會在 Admission 階段攔截這個欄位
+      privileged: true  # ⚠️ 違規點：取得宿主機 root 權限，極度危險
+                        # Kyverno 的 validate-privileged 規則會在此攔截

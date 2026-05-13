@@ -1,9 +1,11 @@
+# 01-storage.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: ebs-sc
 provisioner: ebs.csi.aws.com
-# 設定為：等到有人要求掛載，才真正去 AWS 生出實體硬碟 (省錢防呆機制)
+# 延遲綁定：等到 Pod 確定落在哪個節點，才在同一個 AZ 建立實體硬碟
+# 避免硬碟建在 AZ-A 但 Pod 跑到 AZ-B 導致永遠無法掛載
 volumeBindingMode: WaitForFirstConsumer
 ---
 apiVersion: v1
@@ -11,14 +13,9 @@ kind: PersistentVolumeClaim
 metadata:
   name: ebs-claim
 spec:
-  # 透過 ebs-sc 這個 StorageClass，自動跟 AWS 索取一塊實體的雲端硬碟 (EBS)
-  storageClassName: ebs-sc
-  
-  # ReadWriteOnce 代表這顆硬碟同時間只能插在「一台」實體機器上運作
+  storageClassName: ebs-sc  # 使用上方定義的 StorageClass，向 AWS 自動申請 EBS 硬碟
   accessModes:
-    - ReadWriteOnce
-    
-  # 我們只要跟 AWS 拿小小的一塊 5GB 就夠用了
+    - ReadWriteOnce           # 同時間只允許一個節點掛載，適合資料庫等需要獨佔 IOPS 的場景
   resources:
     requests:
       storage: 5Gi

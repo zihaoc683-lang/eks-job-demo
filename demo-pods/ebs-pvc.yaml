@@ -4,7 +4,7 @@ metadata:
   name: ebs-claim
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteOnce   # EBS 僅支援單一節點讀寫 (RWO)
   storageClassName: ebs-sc
   resources:
     requests:

@@ -1,19 +1,21 @@
+# 03-service.yaml
+# =========================================================================
+# 對外服務入口 (Network Load Balancer)
+# =========================================================================
+# 建立後 AWS 會自動生成一個 NLB，提供固定的對外網址
+# 注意：刪除此 Service 時，AWS 的 NLB 也會一併被回收
+# =========================================================================
+
 apiVersion: v1
 kind: Service
 metadata:
   name: ecommerce-svc
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # 指定使用 NLB 而非舊版 CLB
 spec:
-  # Type LoadBalancer 會觸發 AWS 生成一個實體的 ELB (網路負載均衡器) 給我們
-  # 這也就是我們對外開放給全世界客人的唯一大門網址！
-  type: LoadBalancer
+  type: LoadBalancer  # 觸發 AWS 建立實體負載均衡器
   ports:
-    # 這是對外暴露的 Port
-  - port: 80
-    # 這是實際上 K8S 在內部轉發給 Pod 的 Port (還記得我們 Rollout 設定的 9898 嗎？)
-    targetPort: 9898
-    
-  # 這個 Selector 非常關鍵，所有貼上 app: ecommerce-backend 標籤的機器，Service 都會把流量均分給它們！
+  - port: 80          # 對外開放 80 Port
+    targetPort: 9898  # 轉發至 Pod 內部的 9898 Port
   selector:
-    app: ecommerce-backend
+    app: ecommerce-backend  # 將流量均分給所有帶有此標籤的 Pod

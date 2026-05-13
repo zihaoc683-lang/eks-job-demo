@@ -1,8 +1,16 @@
+# kustomization.yaml (overlays/production)
+# =========================================================================
+# Production 環境客製化設定 (Kustomize Overlay)
+# =========================================================================
+# 繼承 base/ 的共通設定，再針對 production 環境打上差異化 Patch
+# 好處：不需要複製整份 YAML，只維護「與 base 的差異」
+# =========================================================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 bases:
-  - ../../base
+  - ../../base  # 繼承 k8s/base/ 的所有資源定義
 
 patches:
   - target:
@@ -11,8 +19,8 @@ patches:
     patch: |-
       - op: replace
         path: /spec/replicas
-        value: 5
+        value: 5        # Production 環境提升至 5 個副本（base 預設較少）
       - op: add
         path: /spec/template/spec/containers/0/resources/limits
         value:
-          cpu: 500m
+          cpu: 500m     # Production 環境給予更多 CPU 上限

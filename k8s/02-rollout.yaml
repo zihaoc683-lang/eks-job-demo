@@ -1,9 +1,9 @@
+# 02-rollout.yaml
 # =========================================================================
-# 交付治理：金絲雀發布 (Progressive Delivery)
+# 金絲雀發布 (Canary Rollout)
 # =========================================================================
-# 對應職缺要求：「從程式碼變更到可控發布」、「快速回滾」。
-# 我們使用 Argo Rollouts 實作 20% 漸進式引流。
-# 這能有效控制變更的「爆炸半徑 (Blast Radius)」，並在偵測到異常時自動/手動停止放量。
+# 新版本上線時，先只導入 20% 流量觀察，確認無誤後再手動晉升到 100%
+# 有效控制「爆炸半徑 (Blast Radius)」，異常時可秒級回滾
 # =========================================================================
 
 apiVersion: argoproj.io/v1alpha1
@@ -11,24 +11,18 @@ kind: Rollout
 metadata:
   name: ecommerce-backend
 spec:
-  # 為了演示順暢避免 EBS 掛載競爭，我們將副本設為 1
   replicas: 1
   selector:
     matchLabels:
       app: ecommerce-backend
   strategy:
-    # 這裡就是現代 CI/CD 最強的金絲雀(Canary)設定，會逐步取代舊版而不是一次推翻
     canary:
       steps:
-      # Step 1: 當新版上限時，只放入 20% 的測試流量進入新版
-      - setWeight: 20
-      # Step 2: K8S 會停在這裡！必須人工下指令 (promote) 才會繼續！這就是保護傘！
-      - pause: {}
-      # Step 3: 手動確認沒問題後，再把新版流量放到 50%
-      - setWeight: 50
-      - pause: { duration: 10 } # 稍微等個 10 秒
-      # Step 4: 全線上線 (100%)
-      - setWeight: 100
+      - setWeight: 20     # Step 1：新版本只接收 20% 流量
+      - pause: {}         # Step 2：暫停等待人工確認，執行 promote 才繼續
+      - setWeight: 50     # Step 3：確認無誤，放量至 50%
+      - pause: { duration: 10 }
+      - setWeight: 100    # Step 4：全量上線
   template:
     metadata:
       labels:
@@ -36,35 +30,19 @@ spec:
     spec:
       containers:
       - name: backend
-        # 這是實戰教學中最受歡迎的 podinfo 專案，內建圖形化網頁方便展示負載均衡
-        image: stefanprodan/podinfo:6.2.3
+        image: stefanprodan/podinfo:6.2.3  # 內建圖形化介面，方便展示流量分配
         ports:
         - containerPort: 9898
-        
-        # CPU 限制非常重要！因為我們後面要展示 HPA 自動擴容，CPU 給得少 (50m) 才會被壓測輕鬆衝爆 100% 觸發機制
         resources:
           requests:
-            cpu: 50m
+            cpu: 50m      # 刻意設低，讓壓測時更容易觸發 HPA 擴容
             memory: 32Mi
           limits:
             cpu: 200m
             memory: 64Mi
-
-        # 定時健康檢查(Liveness)，如果出錯了就自動砍掉重練，這也是 K8S 自我修復的核心
-        livenessProbe:
+        livenessProbe:    # K8s 定期健康檢查，失敗時自動重啟，實現自我修復
           httpGet:
             path: /healthz
             port: 9898
           initialDelaySeconds: 1
           periodSeconds: 5
-
-        # [數據持久化 Demo]：將 EBS 硬碟掛載進 Pod
-        volumeMounts:
-        - name: persistent-storage
-          mountPath: /data
-
-      # 定義使用的硬碟來源 (參照 01-storage.yaml)
-      volumes:
-      - name: persistent-storage
-        persistentVolumeClaim:
-          claimName: ebs-claim

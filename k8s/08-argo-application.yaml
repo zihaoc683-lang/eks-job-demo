@@ -1,3 +1,11 @@
+# 08-argo-application.yaml
+# =========================================================================
+# GitOps 應用定義 (Argo CD Application)
+# =========================================================================
+# 告訴 Argo CD 要監控哪個 Git Repo，並將其同步到哪個叢集
+# selfHeal: true 是 Drift Detection 的關鍵，任何人為改動都會被自動修復
+# =========================================================================
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -6,13 +14,13 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/zihaoc683-lang/eks-job-demo.git' # 自動替換為您的正確網址
-    path: k8s/overlays/production
-    targetRevision: HEAD
+    repoURL: 'https://github.com/zihaoc683-lang/eks-job-demo.git'
+    path: k8s/overlays/production  # 使用 Kustomize 的 production overlay
+    targetRevision: HEAD           # 永遠追蹤最新的 main branch
   destination:
-    server: 'https://kubernetes.default.svc'
+    server: 'https://kubernetes.default.svc'  # 部署到當前叢集
     namespace: default
   syncPolicy:
     automated:
-      prune: true
-      selfHeal: true # 這是修復 Drift (配置偏移) 的關鍵
+      prune: true      # Git 上刪除的資源，叢集內也會自動刪除
+      selfHeal: true   # 叢集狀態與 Git 不一致時，自動修復回 Git 定義的狀態
