@@ -19,6 +19,7 @@ variable "cluster_name" {
 
 variable "vpc_cidr" {
   description = "VPC 的網段定義 (CIDR Block)，影響可分配的 IP 數量"
+  # /16 = 最多 65534 個可用 IP，對於 EKS 節點與 Pod 的 IP 需求已綽綽有餘
   type        = string
   default     = "10.0.0.0/16"
 }

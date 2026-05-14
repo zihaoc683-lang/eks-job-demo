@@ -28,10 +28,9 @@ module "vpc" {
   public_subnets = ["10.0.101.0/24", "10.0.102.0/24"]
 
   # 成本考量：僅部署一個 NAT Gateway 供所有私有子網共用 (生產環境建議改為每 AZ 一個)
+  # NAT Gateway 讓私有子網的節點可主動對外連網 (例如拉取 Docker Image)，但不對外暴露 IP
   enable_nat_gateway = true
   single_nat_gateway = true
-
-
 
   # 啟用 DNS 解析，這是 EKS 節點加入叢集與服務發現的基礎
   enable_dns_hostnames = true

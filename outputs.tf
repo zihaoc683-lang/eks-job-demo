@@ -19,6 +19,7 @@ output "cluster_endpoint" {
 
 # 快速設定指令
 # 執行此輸出指令即可自動為本地端配置 kubectl 存取權限
+# 用法：terraform output -raw configure_kubectl | bash
 output "configure_kubectl" {
   description = "設定本地 kubectl 以存取此叢集的指令"
   value       = "aws eks --region ${var.region} update-kubeconfig --name ${module.eks.cluster_name}"

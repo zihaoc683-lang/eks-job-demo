@@ -16,6 +16,7 @@ terraform {
       version = "~> 5.0"
     }
     # Kubernetes Provider: 用於管理 EKS 內部的 K8S 資源 (如 ConfigMap, Secrets)
+    # 注意：此 Provider 需等 EKS 叢集建立完成後才能正常連線，不可單獨先 apply
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
@@ -30,6 +31,7 @@ terraform {
 }
 
 # 設定 AWS Provider 的區域，參數化以增加彈性
+# 實際區域由 var.region 控制，預設為 ap-northeast-1 (東京)
 provider "aws" {
   region = var.region
 }

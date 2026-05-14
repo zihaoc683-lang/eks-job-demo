@@ -73,6 +73,8 @@ module "eks" {
     }
   }
 
+  # 開放 NodePort 範圍 (30000-32767)：讓外部流量可直接打到 K8S NodePort Service
+  # 僅供 Demo 環境使用；生產環境建議限縮來源 IP 或改用 LoadBalancer/Ingress 取代 NodePort
   node_security_group_additional_rules = {
     ingress_allow_access_from_anywhere = {
       description = "Allow access from anywhere"
@@ -85,6 +87,7 @@ module "eks" {
   }
 
 
+  # 資源標籤：方便在 AWS Console / Cost Explorer 按專案篩選費用與資源
   tags = {
     Environment = "demo"
     Project     = "ecommerce"
@@ -101,6 +104,8 @@ module "eks" {
 }
 
 # IAM Role for Service Accounts (IRSA)：讓 EBS CSI Driver 有權限操作 AWS API
+# IRSA 原理：透過 OIDC 將 K8S ServiceAccount 綁定到 IAM Role，
+# 使 Pod 無需使用 Node 的 Instance Profile 即可取得細粒度的 AWS 權限 (最小權限原則)
 module "ebs_csi_irsa_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.30"
