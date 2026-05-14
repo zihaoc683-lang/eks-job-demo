@@ -1,17 +1,29 @@
 # =========================================================================
 # 供應鏈安全檢查 (Supply Chain Security Scan)
 # =========================================================================
-# 對應職缺要求：「供應鏈安全、政策控管、映像掃描」。
-# 我們使用 Trivy 同時掃描 IaC 代碼與 Container Image 漏洞。
+# 定位：守護「應用層」的安全
+#   - 掃描 IaC 設定檔（Terraform）是否含有已知設定漏洞
+#   - 掃描 Container Image 是否含有已知 CVE 漏洞
+# 分工：與 terraform-ci.yml 互補
+#   - 本檔：專注「漏洞存在與否」(CVE / Misconfiguration)
+#   - terraform-ci.yml：專注「基礎設施變更品質」(Plan / Format / Policy)
+# 觸發：push 或 PR 到 main，無論變更哪個檔案都會觸發
+# 對應職缺要求：「供應鏈安全、政策控管、映像掃描」
 # =========================================================================
 
 name: Security Scan
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]    # 每次 push 到 main 觸發：保護主線分支
   pull_request:
-    branches: [ main ]
+    branches: [ main ]    # 每次 PR 到 main 觸發：在合併前就完成安全審查
+                          # 兩者都設定確保無論直接 push 或走 PR 流程都不漏掃
+
+# 注意：本 workflow 未設定 permissions 區塊
+# 因為只需要讀取代碼（checkout）和呼叫外部 Action
+# 不需要寫入 PR Comment，故不需要 pull-requests: write
+# （terraform-ci.yml 需要貼 Plan 結果到 PR，所以才需要額外權限）
 
 jobs:
   trivy_scan:
@@ -20,22 +32,49 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        # 注意：這裡使用 v3，與 terraform-ci.yml 的 v4 不同
+        # 兩者功能相同，差異僅在 Node.js runtime 版本
+        # 生產環境建議統一版本避免維護混亂
 
-      # 使用 Trivy 掃描 IaC 設定檔 (Terraform)
+      # -----------------------------------------------------------------------
+      # Job 1：IaC 設定檔掃描 (Terraform Misconfiguration Scan)
+      # -----------------------------------------------------------------------
+      # 掃描對象：專案內所有 .tf 檔案
+      # 掃描工具：Trivy config 模式（專門掃描設定檔，非 image 模式）
+      # 目的：找出 Terraform 代碼中不符合安全最佳實務的設定
+      #       例如：S3 未加密、Security Group 開放 0.0.0.0/0、未啟用 CloudTrail
       - name: Run Trivy vulnerability scanner in IaC mode
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'config'
-          hide-progress: false
-          format: 'table'
-          exit-code: '0' # Demo 模式：顯示掃描報告但不強制失敗 (生產環境應設為 '1')
-          severity: 'CRITICAL,HIGH'
+          scan-type: 'config'       # config 模式：掃描 IaC 設定檔的 Misconfiguration
+                                    # 區別於 image 模式（掃描 Container Image CVE）
+                                    # 和 fs 模式（掃描檔案系統的依賴套件漏洞）
+          hide-progress: false      # 顯示掃描進度條，方便在 CI log 中確認掃描正在進行
+          format: 'table'           # 輸出格式為人類可讀的表格
+                                    # 其他選項：json（機器讀取）、sarif（GitHub Security tab）
+                                    # Demo 環境選 table 方便直接在 log 中展示給面試官看
+          exit-code: '0'            # ⚠️ Demo 模式設定：掃描到漏洞時不中斷 Pipeline
+                                    # 生產環境應設為 '1'：一旦發現 CRITICAL/HIGH 就中斷
+                                    # 目前設為 0 確保 CI 永遠是綠燈，有漏洞也不阻擋 merge
+          severity: 'CRITICAL,HIGH' # 只回報 CRITICAL 和 HIGH 等級，過濾 MEDIUM/LOW 雜訊
+                                    # 生產環境可視風險容忍度調整是否納入 MEDIUM
 
-      # 使用 Trivy 掃描 Container Image (模擬)
+      # -----------------------------------------------------------------------
+      # Job 2：Container Image 掃描 (CVE Vulnerability Scan)
+      # -----------------------------------------------------------------------
+      # 掃描對象：stefanprodan/podinfo:6.2.3（場景二 Canary 演示使用的 stable 版本）
+      # 掃描工具：Trivy image 模式
+      # 目的：確認實際部署的映像沒有已知的高危 CVE
+      #       模擬真實 CI 流程：每次 push 都重新掃描，確保供應鏈安全
       - name: Run Trivy vulnerability scanner for Image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'stefanprodan/podinfo:6.2.3'
+          # 選用 podinfo:6.2.3 的原因：
+          #   1. 與場景二（Canary Rollout）的 stable 版本一致，整個演示使用同一顆映像
+          #   2. 版本夠新，預期漏洞數量少，適合 Demo 展示
+          #   3. 公開映像，CI 不需要額外的 registry 認證設定
           format: 'table'
-          exit-code: '0' # Demo 模式：顯示掃描報告但不強制失敗 (生產環境應設為 '1')
+          exit-code: '0'            # ⚠️ 同上，Demo 模式：有漏洞不中斷
+                                    # 生產環境應設為 '1'
           severity: 'CRITICAL,HIGH'

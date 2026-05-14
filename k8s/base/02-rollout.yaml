@@ -11,7 +11,8 @@ kind: Rollout
 metadata:
   name: ecommerce-backend
 spec:
-  # 為了演示順暢避免 EBS 掛載競爭，我們將副本設為 1
+  # 為了演示順暢避免 EBS 掛載競爭，場景一設為 1
+  # ⚠️ 注意：場景一 HPA 演示前需確認 04-hpa.yaml 的 minReplicas 也為 1，否則會衝突
   replicas: 1
   selector:
     matchLabels:
@@ -20,13 +21,14 @@ spec:
     # 這裡就是現代 CI/CD 最強的金絲雀(Canary)設定，會逐步取代舊版而不是一次推翻
     canary:
       steps:
-      # Step 1: 當新版上限時，只放入 20% 的測試流量進入新版
+      # Step 1: 當新版上線時，只放入 20% 的測試流量進入新版
       - setWeight: 20
-      # Step 2: K8S 會停在這裡！必須人工下指令 (promote) 才會繼續！這就是保護傘！
+      # Step 2: K8S 會停在這裡！必須人工執行以下指令才會繼續放量（這就是保護傘！）
+      # 指令：kubectl argo rollouts promote ecommerce-backend
       - pause: {}
       # Step 3: 手動確認沒問題後，再把新版流量放到 50%
       - setWeight: 50
-      - pause: { duration: 10 } # 稍微等個 10 秒
+      - pause: { duration: 10 } # 稍微等個 10 秒，觀察指標是否穩定
       # Step 4: 全線上線 (100%)
       - setWeight: 100
   template:
@@ -40,8 +42,9 @@ spec:
         image: stefanprodan/podinfo:6.2.3
         ports:
         - containerPort: 9898
-        
-        # CPU 限制非常重要！因為我們後面要展示 HPA 自動擴容，CPU 給得少 (50m) 才會被壓測輕鬆衝爆 100% 觸發機制
+
+        # CPU 限制非常重要！因為我們後面要展示 HPA 自動擴容
+        # CPU 給得少 (50m) 才會被壓測輕鬆衝爆 100% 觸發擴容機制
         resources:
           requests:
             cpu: 50m
@@ -50,7 +53,10 @@ spec:
             cpu: 200m
             memory: 64Mi
 
-        # 定時健康檢查(Liveness)，如果出錯了就自動砍掉重練，這也是 K8S 自我修復的核心
+        # livenessProbe：判斷 Pod 是否「活著」，死了就由 ReplicaSet 自動重啟（自癒核心）
+        # 注意：本設定未加 readinessProbe（就緒探針）
+        # readinessProbe 用於判斷 Pod 是否「準備好接收流量」
+        # 生產環境中兩者應同時使用，此處為簡化 Demo 配置
         livenessProbe:
           httpGet:
             path: /healthz
@@ -59,11 +65,17 @@ spec:
           periodSeconds: 5
 
         # [數據持久化 Demo]：將 EBS 硬碟掛載進 Pod
+        # 掛載點 /data 是 Pod 內部的持久化儲存位置
+        # 即使 Pod 被刪除重建，/data 內的資料仍會保留在 EBS Volume 上
+        # 這是場景三（數據持久化）的核心展示點
         volumeMounts:
         - name: persistent-storage
           mountPath: /data
 
       # 定義使用的硬碟來源 (參照 01-storage.yaml)
+      # ⚠️ PVC 採用 WaitForFirstConsumer 模式：EBS 不會預先建立
+      # 等到 Pod 真正被排程到 Node 後，才在同一可用區即時建立 EBS Volume
+      # 這是雲端成本優化的體現，避免預先建立閒置硬碟浪費費用
       volumes:
       - name: persistent-storage
         persistentVolumeClaim:

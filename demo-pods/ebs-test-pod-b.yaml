@@ -1,17 +1,33 @@
+# ebs-test-pod-b.yaml
+# 角色：驗證者 (Reader)
+# 掛載與 Pod A 相同的 EBS，驗證 Pod A 刪除後資料是否依然存在
+# 本身不寫入任何資料，純粹透過 kubectl exec 手動讀取
+# 依賴：ebs-claim PVC 必須已存在且為 Bound 狀態
+# 對應場景：場景四 Step 3
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ebs-test-pod-b # Pod B 負責「驗證」：Pod A 刪掉後，EBS 上的資料是否還在
+  name: ebs-test-pod-b  # 刻意使用不同名稱，強調這是全新的、與 Pod A 無關的 Pod
+                        # 但掛載同一顆 EBS，證明資料存在於硬碟而非容器內
 spec:
   containers:
   - name: app
-    image: alpine
+    image: alpine       # 在 Kyverno 映像白名單內，Policy 存在時不會被攔截
     command: ["/bin/sh"]
-    args: ["-c", "sleep 3600"] # 只是持續存活，不寫資料 — 讓我們用 kubectl exec 手動讀取
+    args: ["-c", "sleep 3600"]
+    # 只保持存活，不寫入任何資料
+    # 讀取動作由演示者手動執行：kubectl exec ebs-test-pod-b -- cat /data/secret.txt
+    # sleep 3600：讓容器保持存活 1 小時，方便演示期間隨時 exec
+
     volumeMounts:
     - name: persistent-storage
-      mountPath: /data         # 掛載同一顆 EBS，應能看到 Pod A 寫的 secret.txt
+      mountPath: /data  # 掛載同一顆 EBS 到相同路徑
+                        # Pod A 寫入的 /data/secret.txt 在此可直接讀取
+                        # 這證明資料存在於 EBS 上，與 Pod 的生命週期無關
+
   volumes:
   - name: persistent-storage
     persistentVolumeClaim:
-      claimName: ebs-claim     # 與 Pod A 使用完全相同的 PVC！這是能讀到舊資料的關鍵
+      claimName: ebs-claim  # [關鍵] 與 Pod A 使用完全相同的 PVC
+                            # K8s 透過 PVC → PV → EBS 的綁定關係，將同一顆硬碟掛進新容器

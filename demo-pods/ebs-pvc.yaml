@@ -1,11 +1,30 @@
+# ebs-pvc.yaml
+# 角色：儲存資源申請 (Persistent Volume Claim)
+# 向 K8s 申請一塊持久化存儲，由 EBS CSI Driver 自動在 AWS 建立對應的 EBS Volume
+#
+# 生命週期：獨立於 Pod 之外，Pod 刪除後 EBS 資料依然保留
+# 跨場景依賴：場景四、場景十（災難復原）皆依賴此 PVC，演示期間勿刪除
+# 對應場景：場景四前置作業
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ebs-claim
+  name: ebs-claim        # Pod A 與 Pod B 均透過此名稱掛載同一顆 EBS
+                         # 名稱是 PVC 與 Pod 之間的唯一連結點
 spec:
   accessModes:
-    - ReadWriteOnce   # EBS 僅支援單一節點讀寫 (RWO)
-  storageClassName: ebs-sc
+    - ReadWriteOnce      # RWO：同時只能被「單一節點」上的 Pod 掛載
+                         # 適合資料庫等需要獨佔高效能 IOPS 的應用
+                         # 注意：若前一個 Pod 未完全終止，新 Pod 會卡在 Pending
+                         # 若需多 Pod 同時讀寫，應改用 EFS + ReadWriteMany (RWX)
+
+  storageClassName: ebs-sc  # 指定使用自訂的 StorageClass
+                             # ebs-sc 設定了 WaitForFirstConsumer：
+                             #   等 K8s 調度器決定 Pod 落在哪個 Node 後
+                             #   再通知 AWS 於同一個 AZ 建立 EBS
+                             #   避免硬碟建在 AZ-A 但 Pod 跑在 AZ-B 導致永遠無法掛載
+
   resources:
     requests:
-      storage: 5Gi
+      storage: 5Gi       # 向 AWS 申請 5GB 的 EBS Volume
+                         # 實際計費依 AWS EBS gp3 定價，即使未寫滿也以申請量計算

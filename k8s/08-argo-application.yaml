@@ -1,26 +1,54 @@
 # 08-argo-application.yaml
 # =========================================================================
-# GitOps 應用定義 (Argo CD Application)
+# GitOps 應用定義 (Argo CD Application CRD)
 # =========================================================================
-# 告訴 Argo CD 要監控哪個 Git Repo，並將其同步到哪個叢集
-# selfHeal: true 是 Drift Detection 的關鍵，任何人為改動都會被自動修復
+# 這份 YAML 是 Argo CD 的「監控任務書」：
+#   - 告訴 Argo CD 要追蹤哪個 Git Repo 的哪個路徑
+#   - 告訴 Argo CD 要將設定同步到哪個叢集的哪個 namespace
+#   - 定義自動化行為：是否自動同步、是否自動修復偏移
+#
+# 與 Kustomize 的關係：
+#   source.path 指向 k8s/overlays/production
+#   Argo CD 會自動偵測該目錄下有 kustomization.yaml，並用 Kustomize 模式處理
+#   最終部署的是 base + production overlay 合併後的完整設定
 # =========================================================================
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: ecommerce-app
-  namespace: argocd
+  namespace: argocd          # Application CRD 本身必須建立在 argocd namespace
+                             # 與它部署的目標 namespace（destination.namespace）是不同概念
 spec:
-  project: default
+  project: default           # Argo CD Project 是權限隔離單位，可限制 App 能存取哪些 repo 和叢集
+                             # default project 允許存取所有資源，適合 Demo 環境
+                             # 生產環境應建立獨立 Project 限縮權限範圍
+
   source:
     repoURL: 'https://github.com/zihaoc683-lang/eks-job-demo.git'
-    path: k8s/overlays/production  # 使用 Kustomize 的 production overlay
-    targetRevision: HEAD           # 永遠追蹤最新的 main branch
+    path: k8s/overlays/production
+    # 指向 Kustomize 的 production overlay 目錄
+    # Argo CD 偵測到 kustomization.yaml 後自動以 Kustomize 模式渲染
+    # 最終套用的是 base（共通設定）+ production（環境客製化）的合併結果
+    targetRevision: HEAD
+    # HEAD = 永遠追蹤 main branch 的最新 commit
+    # 優點：推送即生效，適合 Demo 展示 GitOps 即時同步
+    # 生產環境建議改為固定 tag（如 v1.2.3），避免 main branch 未經測試的變更直接上線
+
   destination:
-    server: 'https://kubernetes.default.svc'  # 部署到當前叢集
-    namespace: default
+    server: 'https://kubernetes.default.svc'
+    # 這是 K8s 叢集內部的 API Server 地址（cluster.local DNS）
+    # 代表「部署到 Argo CD 自己所在的同一個叢集」（In-Cluster 模式）
+    # 若要管理外部叢集，需改為該叢集的 API Server 外部端點並設定憑證
+    namespace: default        # 工作負載（Rollout、Service 等）部署到 default namespace
+
   syncPolicy:
     automated:
-      prune: true      # Git 上刪除的資源，叢集內也會自動刪除
-      selfHeal: true   # 叢集狀態與 Git 不一致時，自動修復回 Git 定義的狀態
+      prune: true
+      # Git 上刪除的資源，叢集內也會自動刪除
+      # ⚠️ 風險：若不小心在 Git 刪除了 YAML，對應的 K8s 資源也會消失
+      # 生產環境啟用前需確保 Git 操作有完整的 Review 流程
+      selfHeal: true
+      # 叢集狀態與 Git 不一致時（Configuration Drift），自動修復回 Git 定義的狀態
+      # 這是場景七「破壞展示」的核心機制
+      # 任何人直接 kubectl edit / kubectl delete 的改動都會被 Argo CD 撤銷

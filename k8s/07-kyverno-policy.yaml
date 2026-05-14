@@ -2,9 +2,11 @@
 # =========================================================================
 # 安全政策 (Policy as Code)
 # =========================================================================
-# 在 API 層攔截所有不合規的資源，Pod 不會被建立而非建立後再刪除
-# 規則一：禁止特權容器
-# 規則二：限制映像檔來源
+# 核心概念：在 API 層攔截不合規資源，Pod 從一開始就不存在，而非建立後再刪除
+# 爆炸半徑為零：不合規的請求在 Admission Time 直接被拒絕
+#
+# 規則一：禁止特權容器      → 攔截 03-bad-pod.yaml
+# 規則二：限制映像檔來源    → 攔截 kubectl run test-nginx --image=nginx
 # =========================================================================
 
 apiVersion: kyverno.io/v1
@@ -12,12 +14,18 @@ kind: ClusterPolicy  # 全叢集生效；若用 Policy 則只限單一 Namespace
 metadata:
   name: disallow-privileged-containers
 spec:
-  validationFailureAction: Enforce  # Enforce = 直接拒絕；Audit = 只記錄不阻擋（測試期用）
-  background: true                  # 背景掃描已存在的資源並產生合規報告
+  validationFailureAction: Enforce  # Enforce = 直接拒絕請求（演示用）
+                                    # Audit   = 只記錄違規，不阻擋（新政策上線初期觀察用）
+  background: true                  # 背景掃描「已存在」的資源並產生合規報告
+                                    # 注意：背景掃描不會刪除已存在的違規資源
+                                    # 演示前必須手動清除舊 Pod，否則 apply 回傳 unchanged
   rules:
 
+  # -------------------------------------------------------------------------
   # 規則一：禁止特權容器
-  # privileged: true 讓容器獲得宿主機 root 權限，攻擊者可藉此逃逸並控制整個 Node
+  # -------------------------------------------------------------------------
+  # privileged: true 讓容器獲得宿主機 root 權限
+  # 攻擊者可藉此逃逸容器隔離，直接控制整台 Node（Container Escape）
   - name: validate-privileged
     match:
       any:
@@ -28,12 +36,13 @@ spec:
       any:
       - resources:
           namespaces:
-          - kube-system  # 系統元件 (aws-node, ebs-csi) 需要特權才能運作，必須排除
-          - kyverno
+          - kube-system  # 系統元件 (aws-node, ebs-csi-node) 需要特權才能操作宿主機網路與磁碟
+          - kyverno      # Kyverno 自身元件需排除，避免自我攔截
     validate:
       message: "不允許建立特權容器！這違反了公司的安全基準政策。"
       foreach:
-      # 用 foreach 逐一檢查每個 container，確保沒有任何一個是特權的
+      # foreach 逐一檢查每個 container
+      # 確保沒有任何一個容器是特權的（而非只檢查第一個）
       - list: "request.object.spec.containers"
         deny:
           conditions:
@@ -41,9 +50,11 @@ spec:
             - key: "{{ element.securityContext.privileged || false }}"
               operator: Equals
               value: true
+              # || false 處理 securityContext 未定義的情況，避免 null 導致規則報錯
 
-      # initContainers 也必須掃描
-      # 攻擊者常將特權設定藏在此處繞過只掃主容器的 Policy
+      # initContainers 必須同步掃描
+      # 攻擊者常將 privileged: true 藏在 initContainers 裡繞過只掃主容器的 Policy
+      # || `[]` 處理沒有 initContainers 欄位的 Pod，避免 foreach 對空值報錯
       - list: "request.object.spec.initContainers || `[]`"
         deny:
           conditions:
@@ -52,7 +63,11 @@ spec:
               operator: Equals
               value: true
 
+  # -------------------------------------------------------------------------
   # 規則二：限制映像檔來源（防止供應鏈攻擊）
+  # -------------------------------------------------------------------------
+  # 攻擊者若能推送惡意映像到 Docker Hub，工程師一個 kubectl run 就會中招
+  # 只允許受信任的 registry，其他來源一律拒絕
   - name: check-image-registry
     match:
       any:
@@ -71,4 +86,9 @@ spec:
         spec:
           containers:
           - image: "ghcr.io/* | stefanprodan/* | alpine"
-            # 只允許這三個來源，其他一律拒絕（包含 docker.io/nginx）
+            # 白名單說明：
+            #   ghcr.io/*        → GitHub Container Registry（主要受信任來源）
+            #   stefanprodan/*   → 演示用映像（podinfo），Docker Hub 但明確授權
+            #   alpine           → 無 registry prefix 的官方映像，單獨列出
+            #                      因為 Docker Hub 官方映像不帶 domain，pattern 無法用 /* 涵蓋
+            # 未列入的來源（如 docker.io/nginx、nginx）一律拒絕

@@ -3,6 +3,7 @@
 # 水平自動擴縮 (Horizontal Pod Autoscaler)
 # =========================================================================
 # 監控 CPU 使用率，超過門檻時自動增加 Pod 數量；壓力解除後自動縮回
+# 依賴元件：Metrics Server（已於 bootstrap 階段安裝）
 # =========================================================================
 
 apiVersion: autoscaling/v2
@@ -11,31 +12,42 @@ metadata:
   name: ecommerce-hpa
 spec:
   scaleTargetRef:
+    # ⚠️ 注意：這裡指向的是 Argo Rollouts 的 Rollout 資源，而非原生 Deployment
+    # 因為我們用 Rollout 取代了 Deployment，HPA 必須對應正確的資源類型才能生效
     apiVersion: argoproj.io/v1alpha1
     kind: Rollout
     name: ecommerce-backend
+
+  # ⚠️ 注意：minReplicas 設為 2，但 02-rollout.yaml 的 replicas 設為 1
+  # HPA 套用後會自動將副本數提升至 2（HPA 的 minReplicas 優先權較高）
+  # 因此執行 kubectl apply -f k8s/04-hpa.yaml 後，Pod 數量會從 1 自動變為 2
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 10  # 壓測時最多擴展至 10 個 Pod，展示叢集彈性上限
+
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 30  # CPU 超過 30% 即觸發擴容，門檻調低確保壓測時有明顯反應
+        # CPU 超過 30% 即觸發擴容，門檻調低確保壓測時有明顯且即時的反應
+        # 生產環境通常設為 60~80%，此處為 Demo 優化
+        averageUtilization: 30
 
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 0  # 壓力一來立即擴容，不設冷卻等待
+      # 壓力一來立即擴容，不設冷卻等待，確保 Demo 時擴容反應迅速可見
+      stabilizationWindowSeconds: 0
       policies:
       - type: Pods
-        value: 4          # 每次最多新增 4 個 Pod，視覺效果明顯
-        periodSeconds: 10
-      selectPolicy: Max
+        value: 4          # 每次最多新增 4 個 Pod，擴容視覺效果明顯
+        periodSeconds: 10 # 每 10 秒評估一次是否需要繼續擴容
+      selectPolicy: Max   # 多條 policy 時取擴容幅度最大的那條
 
     scaleDown:
-      stabilizationWindowSeconds: 30  # 壓力消失後等待 30 秒再縮容，避免頻繁震盪
+      # 壓力消失後等待 30 秒再縮容，避免流量波動造成 Pod 頻繁建立與刪除（震盪/Thrashing）
+      stabilizationWindowSeconds: 30
       policies:
       - type: Percent
-        value: 100
-        periodSeconds: 15
+        value: 100        # 每次允許縮減當前 Pod 數量的 100%，即可一次縮回最小值
+        periodSeconds: 15 # 每 15 秒評估一次是否繼續縮容

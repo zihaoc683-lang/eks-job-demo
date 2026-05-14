@@ -1,3 +1,17 @@
+# =========================================================================
+# IaC 穩定性與安全檢查流水線 (Terraform CI)
+# =========================================================================
+# 定位：守護「基礎設施層」的變更品質
+#   - 確保 Terraform 代碼格式一致
+#   - 靜態分析是否符合 CIS Benchmark 安全基準
+#   - 預覽基礎設施變更，確認無意外的資源刪除或修改
+#   - 自動將 Plan 結果貼回 PR，降低 Reviewer 審查門檻
+# 分工：與 security-scan.yml 互補
+#   - security-scan.yml：專注「漏洞存在與否」(CVE / Misconfiguration)
+#   - 本檔：專注「基礎設施變更品質」(Plan / Format / Policy)
+# 觸發：push 或 PR 到 main，且變更包含 .tf 檔案時才觸發
+# =========================================================================
+
 name: 'Terraform CI/CD (Multi-Tool Demo)'
 
 on:
@@ -5,24 +19,18 @@ on:
     branches:
       - main
     paths:
-      - '**.tf'
+      - '**.tf'   # 只有 .tf 檔案變更才觸發
+                  # 避免修改 README 或 YAML 也跑 Terraform，節省 CI 資源
   push:
     branches:
       - main
     paths:
-      - '**.tf'
+      - '**.tf'   # 同上，push 到 main 時也只在 .tf 變更時觸發
 
 permissions:
-  contents: read
-  pull-requests: write
-
-# =========================================================================
-# IaC 穩定性與安全檢查流水線 (Terraform CI)
-# =========================================================================
-# 設計思維：在基礎設施變更「發生前」就攔截錯誤。
-# 1. 減少環境漂移：透過 terraform plan 預覽變更。
-# 2. 靜態分析：檢查 Terraform 代碼是否符合安全最佳實務。
-# =========================================================================
+  contents: read          # 讀取 repo 代碼（checkout 需要）
+  pull-requests: write    # 寫入 PR Comment（自動貼 Terraform Plan 結果需要）
+                          # 若拿掉此權限，Step「Update Pull Request with Plan」會失敗
 
 jobs:
   terraform_analysis:
@@ -34,29 +42,71 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        # 注意：未鎖定 Terraform 版本，會使用最新版
+        # 生產環境建議加上 terraform_version: '1.x.x' 鎖定版本
+        # 避免 Terraform 大版本升級導致語法不相容或行為變更（版本漂移）
 
+      # -----------------------------------------------------------------------
+      # Step 1：格式檢查 (Format Check)
+      # -----------------------------------------------------------------------
       - name: Terraform Format Check
         run: terraform fmt -check
+        # -check 模式：只檢查格式是否符合標準，不自動修改檔案
+        # 若格式不符（例如縮排錯誤、對齊不一致）此步驟直接失敗
+        # 目的：強制團隊統一代碼風格，避免風格差異造成 Code Review 雜訊
 
+      # -----------------------------------------------------------------------
+      # Step 2：靜態安全分析 (Checkov Security Scan)
+      # -----------------------------------------------------------------------
       - name: Run Checkov (Security Scan)
         uses: bridgecrewio/checkov-action@master
         with:
           directory: .
-          soft_fail: true # 在 Demo 環境中顯示警告但不中斷，模擬資安分析流程
+          # 掃描整個專案目錄下所有 Terraform 檔案
+          # Checkov 對照 CIS Benchmark、NIST、SOC2 等業界安全基準逐條檢查
+          # 常見 FAILED 項目範例：
+          #   - S3 Bucket 未啟用加密
+          #   - Security Group 對 0.0.0.0/0 開放 SSH (port 22)
+          #   - CloudTrail 未啟用
+          #   - EKS 未啟用 Secrets 加密
+          soft_fail: true
+          # soft_fail: true = Demo 模式：顯示所有 FAILED 項目但不中斷 Pipeline
+          # 生產環境應移除此設定或改為 soft_fail: false
+          # 移除後任何 FAILED 項目都會直接中斷 CI，阻止不合規的基礎設施變更被套用
 
+      # -----------------------------------------------------------------------
+      # Step 3：初始化與計畫預覽 (Terraform Init & Plan)
+      # -----------------------------------------------------------------------
       - name: Terraform Init
         run: terraform init -backend=false
+        # -backend=false：CI 環境不連接真實的 Terraform State（S3）
+        # 原因：
+        #   1. 避免 CI 需要完整的 AWS 憑證才能初始化
+        #   2. 避免 CI 誤修改生產環境的 State 檔案
+        #   3. 本 workflow 只做靜態分析和 Plan 預覽，不需要真實 State
 
       - name: Terraform Plan
-        id: plan
+        id: plan             # 設定 id 讓後續步驟可以用 steps.plan.outputs 引用結果
         run: terraform plan -no-color
+        # -no-color：移除 ANSI 色碼，確保 Plan 輸出貼到 PR Comment 時可正常顯示
         continue-on-error: true
+        # continue-on-error: true：即使 Plan 失敗也繼續執行後續步驟
+        # 目的：確保下一個步驟「Update Pull Request with Plan」能把錯誤訊息貼回 PR
+        # 若不設定，Plan 失敗會直接中斷 job，Reviewer 看不到具體的錯誤內容
 
+      # -----------------------------------------------------------------------
+      # Step 4：自動回報 Plan 結果到 PR (PR Comment)
+      # -----------------------------------------------------------------------
       - name: Update Pull Request with Plan
         uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
+        # 只在 PR 事件時執行，push 到 main 不需要貼 Comment
+        # 因為 push 到 main 通常是 merge 後，已無 PR 可以留言
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN 是 GitHub Actions 自動注入的暫時性 token
+          # 有效期只限本次 workflow 執行，不需要手動設定 Secret
+          # 權限由頂層 permissions.pull-requests: write 控制
           script: |
             const output = `#### Terraform Format and Style 🖌
             #### Terraform Initialization ⚙️
@@ -67,13 +117,19 @@ jobs:
             \`\`\`hcl
             ${process.env.PLAN}
             \`\`\`
+            # process.env.PLAN：由上一個步驟（id: plan）的輸出注入
+            # 包含完整的 terraform plan 文字結果
+            # 用 <details> 折疊避免 Comment 過長影響 PR 閱讀體驗
             
             </details>
             
             *Pusher: @${{ github.actor }}, Action: \`${{ github.action }}\`*`;
-            
+            # github.actor：觸發本次 workflow 的 GitHub 使用者名稱
+            # github.action：本次執行的 Action 名稱，方便追蹤是哪個步驟貼的
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
+              # PR 在 GitHub API 中屬於 issue，用 issue_number 定位
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: output

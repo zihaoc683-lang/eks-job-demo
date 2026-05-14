@@ -3,9 +3,12 @@ kind: Service
 metadata:
   name: ecommerce-svc
   annotations:
+    # 指定使用 NLB (Network Load Balancer)，取代預設的 CLB
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # 指定流量目標模式為 instance，不需要 AWS Load Balancer Controller
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
 spec:
-  # Type LoadBalancer 會觸發 AWS 生成一個實體的 ELB (網路負載均衡器) 給我們
+  # Type LoadBalancer 會觸發 AWS 生成一個實體的 NLB 給我們
   # 這也就是我們對外開放給全世界客人的唯一大門網址！
   type: LoadBalancer
   ports:
@@ -13,7 +16,7 @@ spec:
   - port: 80
     # 這是實際上 K8S 在內部轉發給 Pod 的 Port (還記得我們 Rollout 設定的 9898 嗎？)
     targetPort: 9898
-    
+
   # 這個 Selector 非常關鍵，所有貼上 app: ecommerce-backend 標籤的機器，Service 都會把流量均分給它們！
   selector:
     app: ecommerce-backend
