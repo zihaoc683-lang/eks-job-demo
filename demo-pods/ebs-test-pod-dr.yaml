@@ -1,0 +1,45 @@
+# ebs-test-pod-dr.yaml
+# 角色：災難復原驗證用 Pod (DR Verification Pod)
+# 專為場景十設計，不自動寫入任何資料
+# 資料完全由演示者手動 kubectl exec 寫入，確保復原驗證的說服力
+#
+# 與 ebs-test-pod-a.yaml 的差異：
+#   ebs-test-pod-a.yaml：啟動時自動寫入「總營收一千萬」，場景四用
+#   本檔案：純 sleep，不寫入任何資料，場景十用
+#
+# Pod name 刻意與場景四不同（ebs-test-pod-dr vs ebs-test-pod-a）
+# 避免兩個場景同時存在時發生名稱衝突
+#
+# 依賴：ebs-claim PVC 必須已存在（demo-pods/ebs-pvc.yaml）
+# 對應場景：場景十 災難復原實戰
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ebs-test-pod-dr
+  labels:
+    app: dr-demo  # 與場景四的 storage-demo 標籤區分，方便篩選
+spec:
+  containers:
+  - name: app
+    image: alpine      # 在 Kyverno 映像白名單內，Policy 存在時不會被攔截
+    command: ["/bin/sh"]
+    args:
+    - "-c"
+    - "sleep 3600"
+    # 純粹保持容器存活，不執行任何寫入動作
+    # 資料寫入由演示者手動執行：
+    #   kubectl exec ebs-test-pod-dr -- sh -c "echo '機密資料：2026總營收一千萬' > /data/secret.txt"
+    # 復原後讀取：
+    #   kubectl exec ebs-test-pod-dr -- cat /data/secret.txt
+
+    volumeMounts:
+    - name: persistent-storage
+      mountPath: /data  # EBS 掛載進容器的路徑
+
+  volumes:
+  - name: persistent-storage
+    persistentVolumeClaim:
+      claimName: ebs-claim  # 與場景四使用相同的 PVC
+                            # 場景十的 disaster 指令會刪除此 PVC 再重建
+                            # 這是場景十唯一允許刪除 ebs-claim 的例外情境

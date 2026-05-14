@@ -7,45 +7,76 @@
 # 我們使用 bin/node-fix.ps1 模擬此劇本的執行結果。
 # =========================================================================
 # 技術架構說明：
-# 
+#
 # 1. 組態管理 (Configuration Management)
-#    - Terraform 負責雲端資源分配 (Provisioning)。
-#    - Ansible 負責作業系統層級之配置管理，確保 OS 符合安全合規標準。
-#    - 兩者結合實現「基礎設施即代碼 (IaC)」之完整治理。
-# =========================================================================
+#    - Terraform 負責雲端資源分配 (Provisioning)
+#    - Ansible 負責作業系統層級之配置管理，確保 OS 符合安全合規標準
+#    - 兩者結合實現「基礎設施即代碼 (IaC)」之完整治理
+#
 # 2. 節點加固之必要性 (Security Hardening)
-#    - 雖然 K8s 具備 Pod 隔離，但底層 Worker Node 之安全性為叢集穩定之基石。
-#    - 確保作業系統層級符合合規性要求（如更新維護、時區統一與內核參數強化）。
+#    - 雖然 K8s 具備 Pod 隔離，但底層 Worker Node 之安全性為叢集穩定之基石
+#    - 確保作業系統層級符合合規性要求（安全更新、時區統一、內核參數強化）
+#
+# 3. 映像白名單警告 (Kyverno 相容性)
+#    - 若場景三的 Kyverno Policy 仍存在，bin/ 腳本使用的 nicolaka/netshoot
+#      不在白名單內，會被 Admission Webhook 攔截
+#    - 演示前請確認：kubectl get clusterpolicy disallow-privileged-containers
+#    - 若存在請先刪除：kubectl delete clusterpolicy disallow-privileged-containers
 # =========================================================================
 
 - name: EKS Node Security Hardening & Troubleshooting Tools Setup
   hosts: eks_nodes
-  become: yes # 提權為 root 執行，確保有權限修改系統核心設定
+  # eks_nodes 對應 Ansible inventory 中定義的 EKS Worker Node 群組
+  # 實際使用時需提供 inventory 檔案，指定各 Node 的連線方式（IP 或 SSM）
+  # 範例：ansible-playbook node-hardening.yml -i inventory/eks-nodes.ini
+  become: yes
+  # 提權為 root 執行，確保有權限修改系統核心設定（sysctl、systemd 等）
+  # EKS Worker Node 預設使用者為 ec2-user，需 become 才能執行特權操作
+
   tasks:
-    # 漏洞管理 (Patch Management)：自動化修補已知作業系統漏洞。
+    # -----------------------------------------------------------------------
+    # Task 1：漏洞管理 (Patch Management)
+    # -----------------------------------------------------------------------
+    # EKS Worker Node 使用 Amazon Linux 2023，套件管理器為 dnf（非 apt）
+    # 自動更新所有套件至最新安全版本，修補已知 OS 層級 CVE
     - name: 1. 更新系統所有套件至最新安全版本 (Patch Management)
       dnf:
         name: "*"
         state: latest
       tags: security
 
-    # 標準化維運工具組：預裝常用診斷工具，提升事故處理效率。
+    # -----------------------------------------------------------------------
+    # Task 2：標準化維運工具組 (SRE Essential Tools)
+    # -----------------------------------------------------------------------
+    # 預裝常用診斷工具，確保任何 Node 都有一致的排障能力
+    # 避免事故發生時才發現工具未安裝，延誤 MTTR（平均修復時間）
     - name: 2. 安裝核心維運工具 (SRE Essential Tools)
       dnf:
         name:
-          - htop      # 資源監控：快速查看 CPU/Memory 是否被異常 process 佔用
-          - telnet    # 網絡連線排查：測試 port 是否有通 (網路排障基本功)
-          - tcpdump   # 抓包分析：深層網路問題排查 (Packet Sniffing)
-          - jq        # JSON 處理：CLI 處理 K8s API 回傳的 JSON 必備工具
-          - tmux      # 終端機多工：防止斷線導致長時間運行的排障指令中斷
+          - htop      # 資源監控：即時查看 CPU/Memory，找出異常佔用的 process
+          - telnet    # 網路連線排查：測試 port 是否可達（網路排障基本功）
+          - tcpdump   # 封包分析：深層網路問題排查（Packet Sniffing）
+          - jq        # JSON 處理：解析 kubectl/AWS CLI 回傳的 JSON 結構
+          - tmux      # 終端機多工：防止 SSH 斷線導致長時間排障指令中斷
         state: present
 
-    # 系統時區同步：確保日誌分析 (Log Correlation) 之時間戳一致性。
-    - name: 3. 設定系統時區為 Asia/Taipei (金融/電信業審計合規要求)
+    # -----------------------------------------------------------------------
+    # Task 3：系統時區同步 (Timezone Standardization)
+    # -----------------------------------------------------------------------
+    # 確保所有 Node 的時間戳一致，是 Log Correlation 的前提條件
+    # 若各 Node 時區不同，跨 Node 的日誌分析會出現時間錯位，難以追蹤事故根因
+    # Asia/Taipei 符合金融、電信業的審計合規要求（台灣法規時區）
+    - name: 3. 設定系統時區為 Asia/Taipei (Log Correlation 合規要求)
       timezone:
         name: Asia/Taipei
 
-    # 網路連線優化：調整 TCP somaxconn 以支援高併發微服務流量。
+    # -----------------------------------------------------------------------
+    # Task 4：網路連線優化 (TCP Optimization)
+    # -----------------------------------------------------------------------
+    # net.core.somaxconn 定義 Socket 監聽隊列上限
+    # Linux 預設值 128：在高併發微服務流量下會導致新連線被 Drop（丟包）
+    # 提升至 1024：確保叢集在流量爆增時仍能正常接受連線（Production Ready 標準）
+    # sysctl reload: yes 確保設定即時生效，不需重開機
     - name: 4. 優化核心連線參數 (TCP Optimization)
       sysctl:
         name: net.core.somaxconn
@@ -53,9 +84,19 @@
         state: present
         reload: yes
 
-    # 安全遠端存取：整合 AWS SSM Agent，實現無密鑰審計與存取管理。
+    # -----------------------------------------------------------------------
+    # Task 5：安全遠端存取 (Modern Remote Access)
+    # -----------------------------------------------------------------------
+    # Amazon SSM Agent 取代傳統 SSH，實現無密鑰的安全節點存取
+    # 傳統 SSH 的問題：需管理 Key Pair，存在密鑰洩漏風險
+    # SSM 的優勢：
+    #   - 透過 IAM 角色控制存取權限，整合 AWS CloudTrail 審計日誌
+    #   - 不需要開放 Port 22，縮小攻擊面
+    #   - 支援 Session Manager、Run Command 等現代化維運功能
     - name: 5. 確保 Amazon SSM Agent 正在運行 (現代化遠端排障基礎)
       systemd:
         name: amazon-ssm-agent
         state: started
         enabled: yes
+        # enabled: yes 確保 Node 重開機後 SSM Agent 自動啟動
+        # 避免重開機後失去遠端存取能力
