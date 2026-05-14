@@ -1,7 +1,3 @@
-了解，你想在場景八裡誠實說明 Ansible 為什麼不實際執行，但同時把它變成加分點而不是缺陷。以下是整合後的完整版：
-
-------
-
 ## 🎭 場景八：底層節點安全強化 (Ansible Node Hardening)
 
 **📂 涉及檔案**：`ansible/node-hardening.yml`, `bin/node-audit.ps1`, `bin/node-fix.ps1`, `bin/node-reset.ps1` **展示內容**：透過「審計 → 修復 → 驗證」SRE 閉環，確保 K8s 底層 OS 的安全性與效能。
