@@ -12,6 +12,10 @@
 resource "null_resource" "k8s_cleanup" {
   provisioner "local-exec" {
     when    = destroy
+    # 執行環境注意：此指令為 bash 語法，需在 Linux/macOS 或 Git Bash (Windows) 下執行。
+    # 若在原生 Windows PowerShell 執行 terraform destroy，|| (exit 0) 語法無效，需改用：
+    #   interpreter = ["bash", "-c"]  並確認 bash 已加入 PATH
+    # --ignore-not-found：避免資源不存在時指令回傳失敗而中斷 destroy 流程。
     command = "kubectl delete -f k8s/ -R --ignore-not-found || (exit 0)"
   }
 

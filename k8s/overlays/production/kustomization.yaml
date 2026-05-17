@@ -14,12 +14,12 @@ bases:
 
 patches:
   - target:
-      kind: Deployment
-      name: web-app
+      kind: Rollout
+      name: ecommerce-backend
     patch: |-
       - op: replace
         path: /spec/replicas
-        value: 5        # Production 環境提升至 5 個副本（base 預設較少）
+        value: 2        # Production 環境提升至 2 個副本（base 預設較少）
       - op: add
         path: /spec/template/spec/containers/0/resources/limits
         value:

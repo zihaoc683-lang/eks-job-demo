@@ -18,13 +18,21 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  # 允許從外部存取 EKS API Endpoint (建議生產環境限制來源 IP)
+  # 允許從外部存取 EKS API Endpoint
+  # 安全警告：此設定會將 K8S API Server 暴露於公開網路，任何人都能嘗試連線。
+  # 生產環境務必搭配 cluster_endpoint_public_access_cidrs 限制允許的來源 IP，
+  # 或改為 false 並透過 VPN / Bastion Host 存取。
   cluster_endpoint_public_access = true
 
   # 為了簡化本地測試，自動加權限給執行 Terraform 的 IAM User/Role
   enable_cluster_creator_admin_permissions = true
 
   # 解決 LoadBalancer Sync 失敗：明確加入叢集權限政策
+  # 為什麼需要手動補上這兩個 Policy：
+  # EKS 模組預設只給叢集最基本的權限，但在某些模組版本或帳號設定下，
+  # AWS Load Balancer Controller 在同步 ELB 狀態時會因為權限不足而失敗。
+  # AmazonEKSClusterPolicy：叢集控制平面操作節點/網路的基礎權限。
+  # AmazonEKSVPCResourceController：允許控制平面管理 VPC 內的彈性網路介面 (ENI)。
   iam_role_additional_policies = {
     AmazonEKSClusterPolicy         = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
     AmazonEKSVPCResourceController = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
@@ -74,7 +82,11 @@ module "eks" {
   }
 
   # 開放 NodePort 範圍 (30000-32767)：讓外部流量可直接打到 K8S NodePort Service
-  # 僅供 Demo 環境使用；生產環境建議限縮來源 IP 或改用 LoadBalancer/Ingress 取代 NodePort
+  # 安全風險說明：cidr_blocks = ["0.0.0.0/0"] 代表網際網路上任何 IP 都能掃描並連接這個範圍的 Port。
+  # 這在 Demo 環境是可接受的，但在生產環境會產生以下風險：
+  #   1. 攻擊者可輕易探測所有 NodePort，增加攻擊面。
+  #   2. 若 NodePort Service 沒有做應用層認證，資料可能直接裸奔。
+  # 生產環境建議：限縮來源 IP 至辦公室/VPN 的 CIDR，或完全移除此規則改用 Ingress Controller。
   node_security_group_additional_rules = {
     ingress_allow_access_from_anywhere = {
       description = "Allow access from anywhere"

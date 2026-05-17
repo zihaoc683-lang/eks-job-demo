@@ -15,7 +15,7 @@ spec:
     # ⚠️ 注意：這裡指向的是 Argo Rollouts 的 Rollout 資源，而非原生 Deployment
     # 因為我們用 Rollout 取代了 Deployment，HPA 必須對應正確的資源類型才能生效
     apiVersion: argoproj.io/v1alpha1
-    kind: Rollout
+    kind: Rollout     #從deployment更正為rollout
     name: ecommerce-backend
 
   # ⚠️ 注意：minReplicas 設為 2，但 02-rollout.yaml 的 replicas 設為 1

@@ -27,6 +27,13 @@ terraform {
       source  = "hashicorp/time"
       version = "~> 0.9"
     }
+
+    # Null Provider: 用於執行本地腳本 (cleanup.tf 的 null_resource 隱式依賴此 Provider)
+    # 雖然未明確在此宣告版本，Terraform 會自動引入，但在此記錄以供團隊知悉其用途。
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 

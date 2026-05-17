@@ -19,6 +19,8 @@ module "vpc" {
 
   # 關鍵設定：跨可用區 (Multi-AZ) 配置
   # 這裡取前兩個 AZ，確保叢集具備高可用性 (High Availability)，當單一機房故障時仍能運作。
+  # 為什麼是 2 個而非 3 個：與下方 private_subnets / public_subnets 的數量對齊（各定義了 2 個子網）。
+  # 若要擴展至 3 個 AZ，需同步增加子網 CIDR 定義，並評估 NAT Gateway 的成本增加。
   azs = slice(data.aws_availability_zones.available.names, 0, 2)
 
   # 私有子網：放置 EKS Worker Nodes 與資料庫，不直接對外開放
@@ -27,8 +29,12 @@ module "vpc" {
   # 公有子網：放置 Load Balancer 與 NAT Gateway，負責流量進出通訊
   public_subnets = ["10.0.101.0/24", "10.0.102.0/24"]
 
-  # 成本考量：僅部署一個 NAT Gateway 供所有私有子網共用 (生產環境建議改為每 AZ 一個)
-  # NAT Gateway 讓私有子網的節點可主動對外連網 (例如拉取 Docker Image)，但不對外暴露 IP
+  # 成本考量：僅部署一個 NAT Gateway 供所有私有子網共用
+  # NAT Gateway 讓私有子網的節點可主動對外連網 (例如拉取 Docker Image)，但不對外暴露 IP。
+  # 單一 NAT Gateway 的可用性風險：若該 NAT Gateway 所在的 AZ 發生故障，
+  # 兩個私有子網的所有節點都將同時失去對外連線能力（無法拉取映像檔、無法呼叫 AWS API）。
+  # 生產環境建議將 single_nat_gateway 改為 false，讓每個 AZ 各有獨立的 NAT Gateway，
+  # 代價是約多 2 倍的 NAT Gateway 費用（約 $32/月 per gateway）。
   enable_nat_gateway = true
   single_nat_gateway = true
 
