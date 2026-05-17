@@ -29,3 +29,7 @@ job-demo-clips/
 job-docs-export-pdf/
 docs/02-demo-guide.md
 images/can_Print.md
+
+# Ansible local configurations (Demo placeholders & execution guide)
+ansible/hosts.ini
+ansible/README.md
